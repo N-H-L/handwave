@@ -78,7 +78,9 @@ Verbatim: *"constrained decoding consistently improves the performance of downst
 > *"Validation: While output is syntactically correct JSON, always validate values."*
 > *"Error handling: Implement robust error handling for schema-compliant but semantically incorrect outputs."*
 
-### 🔴 Active regression in our exact domain
+### 🟡 A single unconfirmed report in our exact domain
+
+⚠️ **STATUS CORRECTED:** the thread is real and every detail is verbatim, but it has **1 post, 82 views, zero replies and no Google acknowledgement.** One user's unanswered report, **not a documented platform defect.** Keep the mitigations (they are cheap and correct regardless); **do not cite it as an established bug.**
 [Google AI Developers Forum, 17 Aug 2026](https://discuss.ai.google.dev/t/gemini-3-7-flash-schema-constrained-json-output-degenerates-into-repeated-0-until-maxoutputtokens-regression-vs-gemini-3-flash-preview/178681):
 
 Under `responseMimeType: "application/json"` + `responseSchema`, **`gemini-3.7-flash` intermittently emits a valid JSON prefix then repeats an integer field's digits until `maxOutputTokens`.**

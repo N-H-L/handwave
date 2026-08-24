@@ -103,7 +103,8 @@ Duolingo's 10-K, verbatim:
 
 | Anchor | Price | Status |
 |---|---|---|
-| **Pivot Interactives** | **$11.10/seat/semester = $22.20/student/yr** (same across institutional-PO, student-pay, and course-code channels) | ✅ **Verified** |
+| **Pivot Interactives — HIGHER ED** | **$11.10/seat/semester = $22.20/student/yr** | ✅ Verified |
+| **Pivot Interactives — GRADES 6–12** | 🔴 **$6.10 per seat per YEAR** — a 3.6× difference. Our beachhead is higher-ed so $22.20 holds there, but **the K-12 TAM arithmetic below must use $6.10.** | ✅ Verified |
 | Labster | *"Annual engagements typically begin at $5,000 USD"*, quote-only | ✅ Verified |
 | ExploreLearning Gizmos | ~$6/student/yr | ⚠️ Quote-only, not re-verified |
 | ASSISTments | $0 | Federally/philanthropically funded |

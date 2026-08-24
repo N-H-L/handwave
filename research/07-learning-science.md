@@ -68,7 +68,7 @@ A simulation is a higher-authority, more vivid input than a textbook paragraph *
 
 > Debunking **d = 1.14–1.33**; persistence of misinformation despite debunking **d = 0.75–1.06**. ***"Persistence was stronger and the debunking effect was weaker when audiences generated reasons in support of the initial misinformation."*** And: ***"Surprisingly, however, a detailed debunking message also correlated positively with the misinformation-persistence effect."***
 
-**Our premium feature — make them write down *why* — is precisely the moderator this meta-analysis identifies as making corrections less effective.**
+🔴 **OVER-EXTENDED — see `10-factcheck-corrections.md`.** The numbers are exact, but the moderator is audiences generating reasons **in support of the misinformation** — counter-attitudinal argument generation that entrenches a false belief. **That is not the same construct as asking a learner to write out their reasoning about their own answer.** The paper also reports the opposite-signed result nearby. **Chan et al. is NOT evidence that the rationale will hurt. The experiment is still worth running; the citation must not be used this way.**
 
 The knowledge-in-pieces camp agrees independently. Athanasopoulos (2023), [arXiv:2308.15601](https://arxiv.org/abs/2308.15601), verbatim: *"the intention is to teach and practise the correct idea **without forcing the students to commit**… we would like to **avoid activating the wrong p-prim, which might naturally happen if you force them to commit to an answer**."*
 

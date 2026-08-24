@@ -6,9 +6,11 @@
 
 > **A misconception is exhibited on roughly one-fifth to two-fifths of the occasions where it *could* be exhibited.**
 
+⚠️ **WEAKENED BY FACT-CHECK.** The VanLehn leg of this convergence was inverted and is retracted. Palmer (6% of 545) and CAOS (19–40%) stand; the defensible VanLehn statistic is 45% unstable/unexplained across 67 students, and even that is contested within the paper (hand analysis: 68% stable). **The design recommendation survives; the four-way convergence does not.**
+
 | Source | Domain | Consistency |
 |---|---|---|
-| **VanLehn (1982)** subtraction bugs, 2-day retest, no intervening instruction | arithmetic | **2 of 12 = 17%** kept the same bug set |
+| ~~VanLehn (1982) subtraction bugs~~ | ~~arithmetic~~ | 🔴 **RETRACTED — the figure was inverted. 17% is the INSTABILITY rate; 83% kept the same bug. See `10-factcheck-corrections.md`.** |
 | **Palmer**, 8 physics isomorphs | physics | **6% of 545** fully consistent |
 | **CAOS** (delMas et al. 2007), both/ever ratio across 6 items | statistics | **19–40%** |
 
@@ -73,7 +75,9 @@ DEBUGGY's one clear win, worth keeping for gold-set design: against human expert
 
 **Sophisticated misconception-targeted remediation did not beat simply reteaching the material.**
 
-> 🎯 **Make "reteach the concept" the active control condition.** If Handwave's targeted intervention doesn't beat "show them the correct explanation again," the diagnosis pipeline is expensive decoration. **This is the single most likely way our efficacy claim fails.**
+⚠️ **Scope correction:** the quoted sentence is a paraphrase; the authors explicitly limit the finding to instruction and remediation that are *"primarily rule-based and procedural"* and warn that *"if either or both instruction and remediation had been conceptually based, then the results might have been different."* **Handwave is conceptually based.** See `10-factcheck-corrections.md`.
+
+> 🎯 **Keep it anyway — make "reteach the concept" the active control condition.** If Handwave's targeted intervention doesn't beat "show them the correct explanation again," the diagnosis pipeline is expensive decoration. **This is the single most likely way our efficacy claim fails.**
 
 Compounding: Sala & Gobet — active vs passive control collapses effect sizes by ~85%. Kulik & Fletcher — locally developed tests inflate ITS effects.
 

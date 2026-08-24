@@ -11,6 +11,8 @@ Eight domain reports, compiled 25 Aug 2026. Every file separates **verified** cl
 | 05 | [Generation reliability](05-generation-reliability.md) | Reasoning field first in the schema. Never emit solved numbers. **Headless expected-outcome assertion is the highest-value check we can build.** |
 | 06 | [Business model & funding](06-business-model-and-funding.md) | Launch-domain TAM at 100% share = **$12.6M**. Not venture-scale. NSF SBIR, not VC. **Reuse (R), not caching, drives margin.** |
 | 07 | [Learning science](07-learning-science.md) | delMas 1999 validates the gate (16%→72% vs 22%→49%) — **and three findings say our diagnostic is wrong as currently designed.** |
+| 09 | [Compliance & safety](09-compliance-and-safety.md) | 🔴 **Vertex AI has the same under-18 ban — both Google paths are closed.** Anthropic/OpenAI/Bedrock permit it. EU AI Act high-risk, and profiling is what forecloses the exemption. |
+| 10 | [Fact-check corrections](10-factcheck-corrections.md) | **Four claims wrong, two conclusion-reversing.** Read before quoting any figure. |
 | 08 | [Learner modeling](08-learner-modeling.md) | Misconceptions are exhibited on **~17–40%** of occasions where they could be. Never store a boolean. Generative library, not enumerated. |
 
 ## The five decisions that are settled
@@ -34,4 +36,4 @@ Eight domain reports, compiled 25 Aug 2026. Every file separates **verified** cl
 - Several agents exhausted their web-search budgets and fell back to direct URL fetches. Coverage is uneven; every file has an uncertainty register at the end. **Read them.**
 - **Instrument access is a real blocker:** every PhysPort physics instrument (FCI, FMCE, CSEM) is faculty-gated and the CAOS/ARTIST distribution site is dead. The SRA (Garfield 2003) is ungated and is what we can actually use.
 - Anything marked ⚠️ 2026 preprint has not been peer reviewed.
-- **Nothing here has been independently fact-checked yet.** A verification pass is running against the load-bearing claims; treat figures as provisional until `09-red-team.md` exists.
+- ✅ **A fact-check pass has run.** See `10-factcheck-corrections.md` — it overrides the other files. An adversarial critique is still outstanding.
