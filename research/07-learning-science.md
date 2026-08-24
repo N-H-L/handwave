@@ -12,11 +12,15 @@ This is the most important research file. It both validates the mechanic and ide
 
 **This is Handwave's mechanic, tested against the obvious alternative, in probability, and it won.** Better than POE, better than anything in the PhET corpus, because it isolates exactly our differentiator: prediction-and-confrontation vs guided exploration **of the same simulation**.
 
-⚠️ **NUMBER DISCREPANCY — resolve against the primary source before quoting.** Two independent agents read this paper and reported different figures:
-- Agent A: guided discovery **16%** correct vs predict-then-test **36%** (posttest)
-- Agent B: guided-discovery activity **22% → 49%**; prediction-then-confront revision **16% → 72%** (pre → post)
+✅ **DISCREPANCY RESOLVED** (re-verified by the researching agent): **prediction-and-confront 16% → 72%; guided discovery 22% → 49%** (pre → post, correct-or-good reasoning). An earlier reading of "16% vs 36%" was wrong. Still worth pulling the PDF before this goes in a demo video, but this is now the figure to use.
 
-These may be different measures or different study stages (it is a three-stage paper). **Get the PDF and read Table 1 before this number goes in a deck or a video.**
+### Two more verified supports for the gate
+
+**Crouch, Fagen, Callan & Mazur (2004)** — *fully verified*: **passive demo observation produces no significant gain in explanation quality over never seeing the demo at all (24% vs 22%, p = 0.64). Predicting first does.** This is the single cleanest refutation of "just show them the simulation."
+
+**Brod et al. (2022)** — the asymmetry that justifies the gate: **without a prior prediction, memory for outcomes *decreases* as they get more surprising.** Surprise only helps if you committed first. Without the gate, the most striking sims are the least remembered.
+
+**Wisniewski, Zierer & Hattie (2019)** — feedback *type* carries the largest effect in this corpus: **high-information d = 0.99** vs corrective **0.46** vs reinforcement **0.24**. Combined with Kendeou below: the high-information content must be the causal mechanism, not the verdict.
 
 ### Balance it honestly — the null results exist
 Khazanov & Prado (2010), [ERIC EJ1068215](https://files.eric.ed.gov/fulltext/EJ1068215.pdf), catalogues them: Konold's own computer-modelling intervention gave *"mixed results"*; Garfield & delMas (1989) Coin Toss, *"mixed results"*; Snee (1993) held computer simulations *"may not be helpful in changing misconceptions about probability in some students"*; **Hirsch & O'Donnell (2001) found cognitive-conflict interventions *"did not reach the level of statistical significance."*** And delMas, Garfield & Chance (2002) found gains were **"short lived"** for some students.
@@ -226,3 +230,14 @@ The core mechanic has **better** empirical support than initially credited — d
 1. **Diagnosing from a single prediction when the belief may not be coherent**
 2. **The outcome-match comparison being mathematically invalid in probability**
 3. **A synthetic model that our own diagnostic scores as a success**
+
+
+---
+
+## Instrument availability — a practical blocker
+
+- **Every PhysPort physics instrument (FCI, FMCE, CSEM) is faculty-gated.** Confirmed independently by two agents. A student founder cannot simply download the FCI.
+- **The CAOS/ARTIST distribution site is dead.**
+- ✅ **The SRA (Garfield 2003) is ungated** — 20 items, 8 misconception scales that map onto our taxonomy. See `08-learner-modeling.md`.
+
+→ **For the first study, use the SRA and build our own transfer items. Treat FCI access as something to obtain through a PER faculty partner (see `04-gtm-and-distribution.md`, partnership #3), not as a resource we have.**
