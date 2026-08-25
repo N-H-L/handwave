@@ -27,6 +27,19 @@ type Props = {
   /** Increment to replay. */
   runKey: number;
   playbackRate: number;
+  /**
+   * Hold the very first frame and do not animate. This is what the prediction
+   * gate shows: the student needs to SEE the setup in order to predict about
+   * it, and must not see it resolve.
+   */
+  frozen?: boolean;
+  /**
+   * The student's committed prediction, drawn on the same axes as the outcome.
+   * Kendeou's KReC model: coactivation of the old belief and the new
+   * information is the necessary condition for revision. Putting the
+   * prediction anywhere but here breaks that.
+   */
+  ghost?: { axis: "x" | "y"; value: number; label: string } | null;
   onProgress?: (t: number) => void;
   onDone?: () => void;
 };
@@ -48,7 +61,15 @@ function niceStep(range: number, target: number): number {
   return step * mag;
 }
 
-export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onDone }: Props) {
+export default function SimCanvas({
+  trace,
+  runKey,
+  playbackRate,
+  frozen = false,
+  ghost = null,
+  onProgress,
+  onDone,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const staticRef = useRef<HTMLCanvasElement>(null);
   const dynamicRef = useRef<HTMLCanvasElement>(null);
@@ -76,7 +97,7 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
         c.height = Math.round(cssH * dpr);
         c.style.width = cssW + "px";
         c.style.height = cssH + "px";
-        c.getContext("2d")!.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
 
       const plotW = cssW - PAD.left - PAD.right;
@@ -96,7 +117,11 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
       ];
       geomRef.current = { toPx, w: cssW, h: cssH };
 
-      const ctx = s.getContext("2d")!;
+      const ctx = s.getContext("2d");
+      // A 2D context can genuinely be unavailable: too many live contexts in a
+      // tab, a headless renderer, a browser with canvas disabled. Draw nothing
+      // rather than take the page down with it.
+      if (!ctx) return;
       ctx.clearRect(0, 0, cssW, cssH);
       ctx.font = MONO;
       ctx.textBaseline = "middle";
@@ -162,6 +187,39 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
         ctx.fill();
       }
 
+      // The committed prediction, in Okabe-Ito orange against the blue of the
+      // trajectory. Dashed, because it is a claim rather than a measurement.
+      if (ghost && Number.isFinite(ghost.value)) {
+        ctx.save();
+        ctx.strokeStyle = INK.ghost;
+        ctx.fillStyle = INK.ghost;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        if (ghost.axis === "x") {
+          const [gx] = toPx(ghost.value, 0);
+          ctx.moveTo(gx, PAD.top);
+          ctx.lineTo(gx, PAD.top + plotH);
+        } else {
+          const [, gy] = toPx(0, ghost.value);
+          ctx.moveTo(PAD.left, gy);
+          ctx.lineTo(PAD.left + plotW, gy);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = MONO;
+        if (ghost.axis === "x") {
+          const [gx] = toPx(ghost.value, 0);
+          ctx.textAlign = gx > PAD.left + plotW * 0.75 ? "right" : "left";
+          ctx.fillText(ghost.label, gx + (gx > PAD.left + plotW * 0.75 ? -6 : 6), PAD.top + 10);
+        } else {
+          const [, gy] = toPx(0, ghost.value);
+          ctx.textAlign = "left";
+          ctx.fillText(ghost.label, PAD.left + 6, gy - 8);
+        }
+        ctx.restore();
+      }
+
       ctx.fillStyle = INK.label;
       ctx.textAlign = "center";
       ctx.fillText(view.xLabel, PAD.left + plotW / 2, cssH - 12);
@@ -176,13 +234,14 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
     const ro = new ResizeObserver(draw);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [trace]);
+  }, [trace, ghost]);
 
   // ── dynamic layer ───────────────────────────────────────────────────────
   useEffect(() => {
     const d = dynamicRef.current;
     if (!d) return;
-    const ctx = d.getContext("2d")!;
+    const ctx = d.getContext("2d");
+    if (!ctx) return;
     let raf = 0;
     let start: number | null = null;
 
@@ -258,6 +317,13 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
       onProgress?.(Math.min(upTo, total));
     };
 
+    // Frozen: paint the setup and stop. There is no code path from here to the
+    // outcome that does not go through committing a prediction.
+    if (frozen) {
+      paint(0);
+      return;
+    }
+
     if (reduced) {
       paint(total);
       onDone?.();
@@ -274,16 +340,11 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trace, runKey, playbackRate]);
+  }, [trace, runKey, playbackRate, frozen, ghost]);
 
-  const label =
-    "Projectile trajectory. Lands " +
-    trace.outcome.range_m.toFixed(1) +
-    " metres away after " +
-    trace.outcome.flight_time_s.toFixed(2) +
-    " seconds, reaching " +
-    trace.outcome.apex_m.toFixed(1) +
-    " metres at the top.";
+  const label = frozen
+    ? "The setup, held still. Commit a prediction to run it."
+    : describe(trace);
 
   return (
     <div ref={wrapRef} className="relative h-full w-full">
@@ -291,4 +352,13 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
       <canvas ref={dynamicRef} className="absolute inset-0" role="img" aria-label={label} />
     </div>
   );
+}
+
+/** Screen-reader description of what a completed run did. */
+function describe(trace: Trace): string {
+  const parts = Object.entries(trace.outcome)
+    .filter(([k, v]) => Number.isFinite(v) && !["landed", "touched", "moved"].includes(k))
+    .slice(0, 4)
+    .map(([k, v]) => k.replace(/_/g, " ") + " " + v.toPrecision(4));
+  return trace.simId + " run. " + parts.join(", ") + ".";
 }

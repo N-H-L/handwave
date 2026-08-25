@@ -31,7 +31,7 @@ path for questions nothing in the registry can answer honestly.
 | Day 1 | ✅ Scaffold, spec schema, deterministic core, projectile sim, renderer |
 | Day 2 | ✅ Invariant plots, seeded PRNG |
 | Day 3–4 | ✅ Four more mechanics sims — free fall, pendulum, collision, ramp |
-| Day 5 | The prediction gate |
+| Day 5 | ✅ The prediction gate |
 | Day 6–7 | Probability sims |
 | Day 8–9 | LLM routing and explanation |
 | Day 10–11 | Polish, record, submit |

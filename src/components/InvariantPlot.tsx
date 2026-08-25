@@ -58,7 +58,9 @@ export default function InvariantPlot({ series, times, playhead }: Props) {
       canvas.style.width = cssW + "px";
       canvas.style.height = cssH + "px";
 
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d");
+      // See SimCanvas: a missing 2D context is a real possibility, not a bug.
+      if (!ctx) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
       ctx.font = MONO;

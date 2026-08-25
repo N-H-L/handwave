@@ -145,21 +145,47 @@ export type ValidityRange = {
   breaksDownWhen: string[];
 };
 
-/** What the student must commit to before the Run button unlocks (day 5). */
+/**
+ * What the student must commit to before the Run button unlocks.
+ *
+ * PLAN §3 rule 3 and the one finding that survived every attack: Crouch,
+ * Fagen, Callan & Mazur (2004) — passive observers of a demonstration learn
+ * nothing over students who never saw it, while students who committed a
+ * prediction first "display significantly greater understanding". The gate is
+ * not a feature wrapped around the simulation. It is the reason the
+ * simulation is worth showing.
+ */
 export type PredictionTarget =
   | {
       key: string;
       kind: "numeric";
       prompt: string;
       unit: string;
-      /** Slider/entry bounds. Never centred on the correct answer. */
+      /**
+       * Entry bounds. Deliberately NOT centred on the correct answer — a
+       * slider whose midpoint is the truth is a multiple-choice question with
+       * the answer pre-selected.
+       */
       range: [number, number];
+      /**
+       * Draw the committed value on the simulation canvas against this axis,
+       * where the quantity is a position. Only some predictions are spatial;
+       * the side-by-side comparison is what carries the rest.
+       */
+      ghostAxis?: "x" | "y";
     }
   | {
       key: string;
       kind: "choice";
       prompt: string;
       options: { value: string; label: string }[];
+      /**
+       * Which option the run actually bore out. Takes the whole trace, not
+       * just the outcome, because some of these turn on which idealisations
+       * were in force — a pendulum's period depends on amplitude unless the
+       * small-angle approximation is switched on, and then it provably does not.
+       */
+      resolve: (trace: Trace) => string;
     };
 
 export type RunOptions = {

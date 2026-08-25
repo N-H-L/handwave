@@ -83,6 +83,12 @@ const PREDICTIONS: PredictionTarget[] = [
       { value: "shorter", label: "It takes less time" },
       { value: "same", label: "It stays the same" },
     ],
+    // The question is counterfactual — "if you released it from further back"
+    // — so it turns on which equation is being integrated, not on this run's
+    // numbers. Under the small-angle approximation the period provably does
+    // not depend on amplitude; under the real equation it always does.
+    resolve: (trace) =>
+      trace.idealizations.find((i) => i.key === "small_angle")?.on ? "same" : "longer",
   },
   {
     key: "period_s",

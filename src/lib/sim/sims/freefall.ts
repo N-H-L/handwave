@@ -91,6 +91,15 @@ const PREDICTIONS: PredictionTarget[] = [
       { value: "lighter", label: "The lighter one" },
       { value: "same", label: "They land at the same instant" },
     ],
+    // A millisecond is the honest threshold for "the same instant": below it
+    // no stopwatch, camera or human eye could tell them apart, and claiming a
+    // difference nobody could observe would be its own kind of dishonesty.
+    resolve: (trace) => {
+      const gap = trace.outcome.gap_ms;
+      if (gap > 1) return "heavier";
+      if (gap < -1) return "lighter";
+      return "same";
+    },
   },
   {
     key: "gap_ms",

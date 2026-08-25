@@ -91,6 +91,9 @@ const PREDICTIONS: PredictionTarget[] = [
       { value: "lighter", label: "The lighter one" },
       { value: "equal", label: "They feel exactly the same force" },
     ],
+    // Newton's third law is not a parameter. Every frame of every run in the
+    // test suite asserts force_on_1 === -force_on_2 to twelve decimal places.
+    resolve: () => "equal",
   },
   {
     key: "velocity_2_after_m_s",

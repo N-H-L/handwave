@@ -85,6 +85,9 @@ const PREDICTIONS: PredictionTarget[] = [
       { value: "longer", label: "It would take longer" },
       { value: "same", label: "Exactly the same time" },
     ],
+    // Mass divides out of a = g(sin - mu*cos) entirely, with or without
+    // friction. Asserted against a 100x mass range in the test suite.
+    resolve: () => "same",
   },
   {
     key: "speed_at_bottom_m_s",

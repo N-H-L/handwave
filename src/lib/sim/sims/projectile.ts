@@ -57,7 +57,10 @@ const IDEALIZATIONS: IdealizationDef[] = [
       "Quadratic drag acts opposite the velocity. Range is shorter than the textbook formula and the path is asymmetric — it falls more steeply than it rose.",
     whenOff:
       "The projectile flies in a vacuum. This is the case every textbook formula describes, and it is the case in which a heavy ball and a light ball of the same size behave identically — which is not what happens outside.",
-    default: false,
+    // Defaults to ON, matching freefall: the student's world has air, and a
+    // sim that quietly runs in a vacuum invites us to diagnose beliefs that
+    // are true where they actually live (PLAN §3 rule 2).
+    default: true,
   },
 ];
 
@@ -78,7 +81,11 @@ const PREDICTIONS: PredictionTarget[] = [
     kind: "numeric",
     prompt: "How far from the launch point will it land?",
     unit: "m",
-    range: [0, 120],
+    // Wide enough to contain the vacuum answer too, since the student can
+    // switch air resistance off. A range that excludes the correct answer
+    // makes the prediction unanswerable, which the structural tests now catch.
+    range: [0, 250],
+    ghostAxis: "x",
   },
   {
     key: "path_shape",
@@ -89,6 +96,15 @@ const PREDICTIONS: PredictionTarget[] = [
       { value: "steeper_down", label: "It falls more steeply than it rose" },
       { value: "steeper_up", label: "It rises more steeply than it falls" },
     ],
+    resolve: (trace) => {
+      // Measured, not inferred from the toggle: launching from a height makes
+      // the descent steeper even in a vacuum, so reading this off the air
+      // resistance flag would be wrong for half the parameter space.
+      const diff = trace.outcome.impact_angle_deg - trace.outcome.launch_angle_deg;
+      if (diff > 0.5) return "steeper_down";
+      if (diff < -0.5) return "steeper_up";
+      return "symmetric";
+    },
   },
 ];
 
@@ -285,6 +301,7 @@ export const projectile: Simulator<ProjectileParams> = {
         apex_m: apex,
         impact_speed_m_s: Math.hypot(lastVel.x, lastVel.y),
         impact_angle_deg: (Math.atan2(-lastVel.y, lastVel.x) * 180) / Math.PI,
+        launch_angle_deg: p.angle_deg,
         landed: landed ? 1 : 0,
       },
       idealizations: resolved,

@@ -1,20 +1,35 @@
 "use client";
 
 /**
- * Day 4 harness: five simulators, one generic shell.
+ * Day 5 harness: five simulators behind a prediction gate.
  *
  * Nothing in this file knows any physics. Controls, idealisation toggles,
- * readouts, invariant plots and axis labels are all read off the simulator's
- * own declarations — sims four and five went in without touching a line of
- * layout — and the LLM's parameter schema and the on-screen sliders cannot
- * drift apart, because they are the same declaration.
+ * readouts, invariant plots, prediction prompts and axis labels are all read
+ * off the simulator's own declarations — so the LLM's parameter schema and the
+ * on-screen sliders cannot drift apart, because they are the same declaration.
  *
- * The prediction gate (day 5) slots in at the marked seam.
+ * The state machine is deliberately small and deliberately one-way:
+ *
+ *   predict  --commit-->  ready  --run-->  running  --finish-->  revealed
+ *      ^                                                             |
+ *      +-------------- any change to the setup ----------------------+
+ *
+ * There is no transition into `revealed` that does not pass through `commit`.
+ * That is the entire mechanic, and it is enforced by the ABSENCE OF AN EDGE
+ * rather than by a check somewhere that could be forgotten.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import InvariantPlot from "@/components/InvariantPlot";
+import PredictionGate, { type Commitment, wordCount } from "@/components/PredictionGate";
 import SimCanvas from "@/components/SimCanvas";
+import {
+  getServerSnapshot,
+  getSnapshot,
+  logPrediction,
+  subscribe,
+  summarise,
+} from "@/lib/predictionLog";
 import { REGISTRY, defaultIdealizations, runSpec, type SimId } from "@/lib/sim/registry";
 import { COLLISION_DEFAULTS } from "@/lib/sim/sims/collision";
 import { FREEFALL_DEFAULTS } from "@/lib/sim/sims/freefall";
@@ -90,6 +105,9 @@ const UNIT_SUFFIXES: [string, string][] = [
   ["_j", "J"],
 ];
 
+/** Internal flags and inputs echoed back; not results the student asked for. */
+const HIDDEN_OUTCOMES = ["landed", "touched", "moved", "launch_angle_deg", "release_angle_deg"];
+
 function splitKey(key: string): { label: string; unit: string } {
   for (const [suffix, unit] of UNIT_SUFFIXES) {
     if (key.endsWith(suffix)) {
@@ -116,9 +134,15 @@ export default function Home() {
     collision: defaultIdealizations("collision"),
     incline: defaultIdealizations("incline"),
   });
+
+  const [committed, setCommitted] = useState<Commitment | null>(null);
+  const [started, setStarted] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [runKey, setRunKey] = useState(0);
-  const [hasRun, setHasRun] = useState(false);
   const [t, setT] = useState(0);
+  const [seenSetup, setSeenSetup] = useState("");
+
+  const log = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const sim = REGISTRY[simId];
   const params = allParams[simId];
@@ -128,7 +152,6 @@ export default function Home() {
     () => ({ sim_id: simId, params, idealizations: ideal }),
     [simId, params, ideal],
   );
-
   const trace = useMemo(() => runSpec(spec), [spec]);
   const closed = useMemo(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,35 +160,78 @@ export default function Home() {
   );
   const times = useMemo(() => trace.frames.map((f) => f.t), [trace]);
 
-  const reset = () => {
-    setHasRun(false);
-    setRunKey((k) => k + 1);
-  };
+  /** Identity of the current setup. A prediction is a claim about exactly this. */
+  const setupKey = useMemo(() => JSON.stringify(spec), [spec]);
 
-  const setParam = (key: string, value: number) => {
+  // Changing anything about the setup voids the commitment and re-closes the
+  // gate. Deliberate: a prediction made about a 45-degree launch is not a
+  // prediction about a 20-degree one, and letting it stand would quietly turn
+  // the mechanic into a scoreboard.
+  //
+  // Adjusted during render, not in an effect: an effect would let one frame
+  // through in which the outcome is on screen for a setup nobody predicted.
+  // For this particular reset that frame is the entire bug.
+  if (setupKey !== seenSetup) {
+    setSeenSetup(setupKey);
+    setCommitted(null);
+    setStarted(false);
+    setRevealed(false);
+    setT(0);
+  }
+
+  // Log once per revealed run, not once per render.
+  const loggedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!revealed || !committed) return;
+    const stamp = setupKey + "#" + runKey;
+    if (loggedFor.current === stamp) return;
+    loggedFor.current = stamp;
+
+    const resolved: Record<string, string | number> = {};
+    for (const target of sim.predictions) {
+      resolved[target.key] =
+        target.kind === "choice" ? target.resolve(trace) : trace.outcome[target.key];
+    }
+    logPrediction({
+      ts: Date.now(),
+      simId,
+      setupKey,
+      values: committed.values,
+      resolved,
+      rationale: committed.rationale,
+      words: wordCount(committed.rationale),
+      thinkingMs: committed.thinkingMs,
+    });
+  }, [revealed, committed, setupKey, runKey, sim, simId, trace]);
+
+  const ghostTarget = sim.predictions.find(
+    (p) => p.kind === "numeric" && p.ghostAxis !== undefined,
+  );
+  const ghost =
+    committed && ghostTarget && ghostTarget.kind === "numeric" && ghostTarget.ghostAxis
+      ? {
+          axis: ghostTarget.ghostAxis,
+          value: Number(committed.values[ghostTarget.key]),
+          label: "your prediction",
+        }
+      : null;
+
+  const setParam = (key: string, value: number) =>
     setAllParams((p) => ({ ...p, [simId]: { ...p[simId], [key]: value } }));
-    setHasRun(false);
-  };
 
-  const setIdeal = (key: string, value: boolean) => {
+  const setIdeal = (key: string, value: boolean) =>
     setAllIdeal((p) => ({ ...p, [simId]: { ...p[simId], [key]: value } }));
-    setHasRun(false);
-  };
 
-  const chooseSim = (id: SimId) => {
-    setSimId(id);
-    setHasRun(false);
-    setRunKey((k) => k + 1);
-  };
+  const summary = summarise(log);
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Handwave</h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-          Hand-written, unit-tested simulators driven by a typed spec. The model never writes
-          the physics — on day 8 it will choose one of these and fill in its parameters, and
-          nothing else.
+          Hand-written, unit-tested simulators behind a prediction gate. The model never
+          writes the physics — on day 8 it will choose one of these and fill in its
+          parameters, and nothing else.
         </p>
       </header>
 
@@ -173,7 +239,7 @@ export default function Home() {
         {SIM_ORDER.map((id) => (
           <button
             key={id}
-            onClick={() => chooseSim(id)}
+            onClick={() => setSimId(id)}
             aria-current={id === simId ? "page" : undefined}
             className={
               "rounded-md px-3 py-1.5 text-sm " +
@@ -189,89 +255,110 @@ export default function Home() {
 
       <p className="mb-4 text-base text-zinc-800">{sim.question}</p>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <section>
-          <div className="h-[26rem] w-full rounded-lg border border-zinc-200 bg-white">
+          <div className="relative h-[26rem] w-full rounded-lg border border-zinc-200 bg-white">
             <SimCanvas
               trace={trace}
               runKey={runKey}
-              playbackRate={hasRun ? FULL : SLOW}
+              playbackRate={revealed ? FULL : SLOW}
+              frozen={!started}
+              ghost={ghost}
               onProgress={setT}
-              onDone={() => setHasRun(true)}
+              onDone={() => setRevealed(true)}
             />
+            {!started && (
+              <div className="pointer-events-none absolute left-3 top-3 rounded bg-zinc-900/85 px-2 py-1 text-[11px] font-medium text-white">
+                {committed ? "ready to run" : "the setup — not running yet"}
+              </div>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
-              onClick={reset}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+              disabled={!committed}
+              onClick={() => {
+                setStarted(true);
+                setRevealed(false);
+                setT(0);
+                setRunKey((k) => k + 1);
+              }}
+              className={
+                "rounded-md px-4 py-2 text-sm font-medium " +
+                (committed
+                  ? "bg-zinc-900 text-white hover:bg-zinc-700"
+                  : "cursor-not-allowed bg-zinc-200 text-zinc-400")
+              }
             >
-              Replay
+              {committed ? (revealed ? "Run again" : "Run it") : "Locked — predict first"}
             </button>
             <span className="font-mono text-xs tabular-nums text-zinc-500">
               t = {t.toFixed(2)} s
             </span>
             <span className="ml-auto text-xs text-zinc-400">
-              {hasRun ? "full speed" : "first run plays slowly"}
+              {!started ? "held at the setup" : revealed ? "full speed" : "first run plays slowly"}
             </span>
           </div>
 
-          {/* ── seam: the day-5 prediction gate goes here. Until it exists, the
-              outcome is revealed only after the run finishes, so the habit the
-              gate enforces is already the default. ─────────────────────────── */}
-          <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              What the simulator computed
-            </h2>
-            {hasRun ? (
-              <>
-                <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                  {Object.entries(trace.outcome)
-                    .filter(([k]) => !["landed", "touched", "moved"].includes(k))
-                    .map(([k, v]) => {
-                      const { label, unit } = splitKey(k);
-                      return (
-                        <div key={k}>
-                          <dt className="text-xs text-zinc-500">{label}</dt>
-                          <dd className="font-mono tabular-nums">
-                            {fmt(v)}
-                            <span className="ml-0.5 text-xs text-zinc-400">
-                              {Number.isFinite(v) ? unit : ""}
-                            </span>
-                          </dd>
-                        </div>
-                      );
-                    })}
-                </dl>
-                {closed && (
-                  <p className="mt-3 border-t border-zinc-200 pt-3 font-mono text-[11px] leading-relaxed tabular-nums text-zinc-500">
-                    closed form:{" "}
-                    {Object.entries(closed)
-                      .filter(([k]) => k in trace.outcome && Number.isFinite(closed[k]))
-                      .map(([k, v]) => {
-                        const err =
-                          v === 0
-                            ? Math.abs(trace.outcome[k])
-                            : Math.abs(trace.outcome[k] - v) / Math.abs(v);
-                        return splitKey(k).label + " " + fmt(v) + " (err " + err.toExponential(1) + ")";
-                      })
-                      .join(" · ")}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-zinc-500">
-                Hidden until the run finishes. Reading the answer before you commit to one is
-                the failure mode this whole product exists to prevent.
-              </p>
-            )}
+          <div className="mt-4">
+            <PredictionGate
+              targets={sim.predictions}
+              setupKey={setupKey}
+              committed={committed}
+              onCommit={setCommitted}
+              trace={trace}
+              revealed={revealed}
+            />
           </div>
 
-          <div className="mt-4 space-y-4">
-            {trace.invariants.map((series) => (
-              <InvariantPlot key={series.key} series={series} times={times} playhead={t} />
-            ))}
-          </div>
+          {revealed && (
+            <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                What the simulator computed
+              </h2>
+              <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                {Object.entries(trace.outcome)
+                  .filter(([k]) => !HIDDEN_OUTCOMES.includes(k))
+                  .map(([k, v]) => {
+                    const { label, unit } = splitKey(k);
+                    return (
+                      <div key={k}>
+                        <dt className="text-xs text-zinc-500">{label}</dt>
+                        <dd className="font-mono tabular-nums">
+                          {fmt(v)}
+                          <span className="ml-0.5 text-xs text-zinc-400">
+                            {Number.isFinite(v) ? unit : ""}
+                          </span>
+                        </dd>
+                      </div>
+                    );
+                  })}
+              </dl>
+              {closed && (
+                <p className="mt-3 border-t border-zinc-200 pt-3 font-mono text-[11px] leading-relaxed tabular-nums text-zinc-500">
+                  closed form:{" "}
+                  {Object.entries(closed)
+                    .filter(([k]) => k in trace.outcome && Number.isFinite(closed[k]))
+                    .map(([k, v]) => {
+                      const err =
+                        v === 0
+                          ? Math.abs(trace.outcome[k])
+                          : Math.abs(trace.outcome[k] - v) / Math.abs(v);
+                      return splitKey(k).label + " " + fmt(v) + " (err " + err.toExponential(1) + ")";
+                    })
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {revealed && (
+            <div className="mt-4 space-y-4">
+              {trace.invariants.map((series) => (
+                <InvariantPlot key={series.key} series={series} times={times} playhead={t} />
+              ))}
+            </div>
+          )}
         </section>
 
         <aside className="space-y-6">
@@ -289,7 +376,6 @@ export default function Home() {
                       ...p,
                       [simId]: { ...defaultIdealizations(simId), ...(preset.ideal ?? {}) },
                     }));
-                    reset();
                   }}
                   className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100"
                 >
@@ -348,6 +434,27 @@ export default function Home() {
                 <li key={b}>{b}</li>
               ))}
             </ul>
+          </Panel>
+
+          <Panel title="Gate 1 instrument">
+            <p className="text-xs leading-relaxed text-zinc-500">
+              Whether students write real predictions is the first thing that has to be
+              true. Under 40% substantive and the mechanic fails. Stored in this browser
+              only — nothing is sent anywhere.
+            </p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+              <dt className="text-zinc-500">logged</dt>
+              <dd>{summary.total}</dd>
+              <dt className="text-zinc-500">&gt;8 words</dt>
+              <dd>
+                {summary.substantive}
+                {summary.total > 0 ? " (" + summary.substantivePct.toFixed(0) + "%)" : ""}
+              </dd>
+              <dt className="text-zinc-500">median words</dt>
+              <dd>{summary.medianWords}</dd>
+              <dt className="text-zinc-500">median think</dt>
+              <dd>{summary.medianThinkingSec.toFixed(1)} s</dd>
+            </dl>
           </Panel>
 
           <Panel title="The spec">
