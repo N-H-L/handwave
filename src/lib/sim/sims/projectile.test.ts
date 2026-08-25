@@ -61,7 +61,9 @@ describe("invariants", () => {
     const trace = projectile.run(withParams({ angle_deg: 55 }), vacuum);
     const energy = trace.invariants.find((i) => i.key === "energy_j")!;
     expect(energy.law).toBe("conserved");
-    expect(relativeDrift(energy.values)).toBeLessThan(1e-6);
+    // Velocity-Verlet is exact for constant acceleration, so the interior
+    // of the trace sits at 2.4e-14. The residue is the landing sub-step.
+    expect(relativeDrift(energy.values)).toBeLessThan(1e-9);
     expect(invariantHolds(energy)).toBe(true);
   });
 

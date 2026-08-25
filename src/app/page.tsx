@@ -11,8 +11,8 @@
  */
 
 import { useMemo, useState } from "react";
+import InvariantPlot from "@/components/InvariantPlot";
 import SimCanvas from "@/components/SimCanvas";
-import { invariantHolds, relativeDrift } from "@/lib/sim/integrate";
 import { getSimulator, runSpec } from "@/lib/sim/registry";
 import { PROJECTILE_DEFAULTS } from "@/lib/sim/sims/projectile";
 import type { ProjectileParams } from "@/lib/sim/sims/projectile";
@@ -54,6 +54,7 @@ export default function Home() {
   const trace = useMemo(() => runSpec(spec), [spec]);
   const closed = sim.closedForm(params, { air_resistance: air });
   const energy = trace.invariants.find((i) => i.key === "energy_j")!;
+  const times = useMemo(() => trace.frames.map((f) => f.t), [trace]);
 
   const set = (k: keyof ProjectileParams) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setParams((p) => ({ ...p, [k]: Number(e.target.value) }));
@@ -137,6 +138,10 @@ export default function Home() {
               </p>
             )}
           </div>
+
+          <div className="mt-4">
+            <InvariantPlot series={energy} times={times} playhead={t} unit="J" />
+          </div>
         </section>
 
         <aside className="space-y-6">
@@ -182,29 +187,6 @@ export default function Home() {
                 </p>
               </div>
             ))}
-          </Panel>
-
-          <Panel title="Invariant">
-            <div className="flex items-baseline justify-between text-sm">
-              <span>{energy.label}</span>
-              <span
-                className={
-                  "font-mono text-xs " +
-                  (invariantHolds(energy) ? "text-emerald-700" : "text-red-700")
-                }
-              >
-                {invariantHolds(energy) ? "holds" : "VIOLATED"}
-              </span>
-            </div>
-            <p className="mt-1 font-mono text-xs tabular-nums text-zinc-500">
-              law: {energy.law} · drift {relativeDrift(energy.values).toExponential(2)} · tol{" "}
-              {energy.tolerance.toExponential(0)}
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-              Asserted on every run, and in CI before anything renders. It is a necessary
-              check, not a sufficient one — a sim can conserve energy exactly and still teach
-              something false.
-            </p>
           </Panel>
 
           <Panel title="Where this model stops being true">

@@ -11,8 +11,6 @@ import {
   DEFAULT_MAX_STEPS,
   crossingFraction,
   initVerlet,
-  lerp,
-  lerpVec,
   verletStep,
 } from "../integrate";
 import type {
@@ -195,13 +193,31 @@ export const projectile: Simulator<ProjectileParams> = {
       // Ground crossing: y goes from >= 0 to < 0. Linear interpolation, not
       // bisection — see integrate.ts crossingFraction.
       if (prev.pos.y >= 0 && s.pos.y < 0) {
-        const f = crossingFraction(prev.pos.y, s.pos.y);
-        const pos = lerpVec(prev.pos, s.pos, f);
-        const vel = lerpVec(prev.vel, s.vel, f);
-        pos.y = 0;
-        push(lerp(prevT, t, f), pos, vel);
-        s = { pos, vel, acc: s.acc };
-        t = lerp(prevT, t, f);
+        // Land with one short Verlet sub-step of exactly the crossing
+        // duration, rather than interpolating between the frames either side.
+        //
+        // Lerping is what this did first, and it put a 5.9e-8 relative energy
+        // spike on the final frame -- six orders of magnitude above the
+        // integrator's own 2.4e-14. Harmless numerically, but it drew a step
+        // at the end of an otherwise flat invariant plot, which reads as a
+        // defect in exactly the chart whose job is to show there isn't one.
+        //
+        // A single Newton refinement, not a bisection loop: PLAN §4 cuts
+        // iterative event detection as the thing a longer build dies on.
+        let f = crossingFraction(prev.pos.y, s.pos.y);
+        let landing = verletStep(prev, dt * f, accel, prevT);
+        const denom = prev.pos.y - landing.pos.y;
+        if (denom !== 0) {
+          const refined = Math.max(0, Math.min(1, f * (prev.pos.y / denom)));
+          if (Number.isFinite(refined) && refined > 0) {
+            f = refined;
+            landing = verletStep(prev, dt * f, accel, prevT);
+          }
+        }
+        const pos = { x: landing.pos.x, y: 0 };
+        push(prevT + dt * f, pos, landing.vel);
+        s = { pos, vel: landing.vel, acc: landing.acc };
+        t = prevT + dt * f;
         landed = true;
         break;
       }
@@ -235,7 +251,10 @@ export const projectile: Simulator<ProjectileParams> = {
           // assert changes with the idealization; it is never switched off.
           law: drag ? "non_increasing" : "conserved",
           values: energy,
-          tolerance: 1e-4,
+          // Worst measured drift across the launch envelope is 1.5e-10, so
+          // this band is ~60x headroom. Tight enough that a real regression
+          // in the integrator or the landing step trips it.
+          tolerance: 1e-8,
           active: true,
         },
       ],
