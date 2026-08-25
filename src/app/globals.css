@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/*
+ * Committed to a light ground for now. The default create-next-app template
+ * flips to a dark palette on `prefers-color-scheme: dark`, which would put
+ * zinc-600 text on near-black and fail contrast everywhere. A dark theme is a
+ * real piece of work (the canvas ink needs its own palette too) and it is not
+ * day-1 work — so the honest move is to not half-do it.
+ */
+body {
+  background: #fafafa;
+  color: #18181b;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Numbers that change on screen must not jitter their own width. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
