@@ -74,6 +74,40 @@ export const PendulumSpecSchema = z.object({
   idealizations: z.object({ small_angle: z.boolean() }).optional(),
 });
 
+export const CollisionParamsSchema = z.object({
+  mass_1_kg: z.number().min(0.001).max(100000),
+  velocity_1_m_s: z.number().min(-300).max(300),
+  mass_2_kg: z.number().min(0.001).max(100000),
+  velocity_2_m_s: z.number().min(-300).max(300),
+  // Zero is excluded: a perfectly inelastic contact is a singular limit of
+  // this spring-dashpot model, not a value it can take. 0.01 looks like
+  // sticking and stays inside the model.
+  restitution: z.number().min(0.01).max(1),
+  contact_stiffness_n_m: z.number().min(1e3).max(1e9),
+  radius_m: z.number().min(0.01).max(50),
+});
+
+export const CollisionSpecSchema = z.object({
+  sim_id: z.literal("collision"),
+  params: CollisionParamsSchema,
+  idealizations: z.object({ perfectly_elastic: z.boolean() }).optional(),
+});
+
+export const InclineParamsSchema = z.object({
+  incline_angle_deg: z.number().min(0.1).max(89),
+  length_m: z.number().min(0.05).max(1000),
+  mass_kg: z.number().min(0.001).max(10000),
+  mu_static: z.number().min(0).max(3),
+  mu_kinetic: z.number().min(0).max(3),
+  gravity_m_s2: z.number().min(0.1).max(30),
+});
+
+export const InclineSpecSchema = z.object({
+  sim_id: z.literal("incline"),
+  params: InclineParamsSchema,
+  idealizations: z.object({ friction: z.boolean() }).optional(),
+});
+
 /**
  * Add each new simulator here as a member. The union is closed by
  * construction: a model cannot name a simulator that does not exist.
@@ -85,6 +119,8 @@ export const SimSpecSchema = z.discriminatedUnion("sim_id", [
   ProjectileSpecSchema,
   FreeFallSpecSchema,
   PendulumSpecSchema,
+  CollisionSpecSchema,
+  InclineSpecSchema,
 ]);
 
 export type SimSpec = z.infer<typeof SimSpecSchema>;

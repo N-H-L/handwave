@@ -41,10 +41,19 @@ export type Domain = {
 export type InvariantSeries = {
   key: string;
   label: string;
+  /** Physical unit, for the axis. Declared here so the UI never guesses it. */
+  unit: string;
   /** 'conserved' -> |max-min|/|mean| <= tolerance. 'non_increasing' -> monotone. */
   law: "conserved" | "non_increasing";
   values: number[];
   tolerance: number;
+  /**
+   * Characteristic magnitude to measure drift against, when the conserved
+   * quantity's own mean is a bad yardstick. Total momentum in a head-on
+   * collision is near zero by construction, so dividing by it would turn a
+   * perfect run into a division by almost nothing.
+   */
+  scale?: number;
   /** Set false by the run itself when an idealization legitimately breaks it. */
   active: boolean;
 };
@@ -72,6 +81,8 @@ export type View = {
   ground: number | null;
   /** Rigid connections drawn every frame: a pendulum rod, a spring. */
   links: { from: Vec2; toBody: number }[];
+  /** Static world geometry: the surface of an inclined plane, a wall. */
+  segments: { from: Vec2; to: Vec2 }[];
   /** Leave the path behind the body. Wrong for anything that retraces itself. */
   trail: boolean;
 };

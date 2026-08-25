@@ -140,6 +140,19 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
         ctx.stroke();
       }
 
+      // Static world geometry: the surface of a ramp, a wall.
+      ctx.strokeStyle = INK.ground;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      for (const seg of view.segments) {
+        const [sx, sy] = toPx(seg.from.x, seg.from.y);
+        const [ex, ey] = toPx(seg.to.x, seg.to.y);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+      }
+
       // Fixed anchors for any links (a pendulum pivot).
       ctx.fillStyle = INK.ground;
       for (const link of view.links) {

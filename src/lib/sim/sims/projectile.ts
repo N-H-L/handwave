@@ -260,12 +260,14 @@ export const projectile: Simulator<ProjectileParams> = {
         xAxis: true,
         ground: 0,
         links: [],
+        segments: [],
         trail: true,
       },
       invariants: [
         {
           key: "energy_j",
           label: "Total mechanical energy",
+          unit: "J",
           // Drag is dissipative, so energy legitimately falls. The law we
           // assert changes with the idealization; it is never switched off.
           law: drag ? "non_increasing" : "conserved",

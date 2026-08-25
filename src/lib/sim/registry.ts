@@ -11,7 +11,9 @@
  * instead of a runtime one.
  */
 
+import { collision } from "./sims/collision";
 import { freefall } from "./sims/freefall";
+import { incline } from "./sims/incline";
 import { pendulum } from "./sims/pendulum";
 import { projectile } from "./sims/projectile";
 import { SimSpecSchema, type SimSpec } from "./spec";
@@ -21,6 +23,8 @@ export const REGISTRY = {
   projectile,
   freefall,
   pendulum,
+  collision,
+  incline,
 } as const;
 
 export type SimId = keyof typeof REGISTRY;
@@ -54,6 +58,10 @@ export function runSpec(input: unknown): Trace {
       return freefall.run(spec.params, ideal);
     case "pendulum":
       return pendulum.run(spec.params, ideal);
+    case "collision":
+      return collision.run(spec.params, ideal);
+    case "incline":
+      return incline.run(spec.params, ideal);
     default: {
       // Exhaustiveness guard: adding a member to SimSpecSchema without adding
       // a case here will not compile.

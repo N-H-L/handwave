@@ -91,10 +91,27 @@ export function relativeDrift(values: number[]): number {
   return (max - min) / mean;
 }
 
+/**
+ * Drift of a series, measured against its declared scale where it has one and
+ * against its own mean otherwise.
+ */
+export function driftOf(inv: InvariantSeries): number {
+  if (inv.scale !== undefined && inv.scale > 0) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const v of inv.values) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    return inv.values.length === 0 ? 0 : (max - min) / inv.scale;
+  }
+  return relativeDrift(inv.values);
+}
+
 /** True when the series obeys the law it declares. Asserted in CI and on screen. */
 export function invariantHolds(inv: InvariantSeries): boolean {
   if (!inv.active) return true;
-  if (inv.law === "conserved") return relativeDrift(inv.values) <= inv.tolerance;
+  if (inv.law === "conserved") return driftOf(inv) <= inv.tolerance;
   for (let i = 1; i < inv.values.length; i++) {
     // Allow tolerance-sized upticks from float noise.
     if (inv.values[i] > inv.values[i - 1] + inv.tolerance * Math.abs(inv.values[0])) return false;

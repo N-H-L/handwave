@@ -241,6 +241,7 @@ export const pendulum: Simulator<PendulumParams> = {
         xAxis: false,
         ground: null,
         links: [{ from: { x: 0, y: 0 }, toBody: 0 }],
+        segments: [],
         // An oscillator retraces its own arc; a trail would just paint over it.
         trail: false,
       },
@@ -248,6 +249,7 @@ export const pendulum: Simulator<PendulumParams> = {
         {
           key: "energy_j",
           label: linear ? "Harmonic energy (linearised)" : "Total mechanical energy",
+          unit: "J",
           law: "conserved",
           values: energy,
           // Velocity-Verlet is symplectic but only second-order, so a

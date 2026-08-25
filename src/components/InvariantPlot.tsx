@@ -18,13 +18,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { INK, OKABE_ITO } from "@/lib/palette";
-import { relativeDrift } from "@/lib/sim/integrate";
+import { driftOf, invariantHolds } from "@/lib/sim/integrate";
 import type { InvariantSeries } from "@/lib/sim/types";
 
 type Props = {
   series: InvariantSeries;
   times: number[];
-  unit?: string;
   /** Sim-time of the playhead, so the chart advances with the animation. */
   playhead?: number;
 };
@@ -32,14 +31,17 @@ type Props = {
 const PAD = { left: 58, right: 12, top: 10, bottom: 22 };
 const MONO = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
 
-export default function InvariantPlot({ series, times, unit = "J", playhead }: Props) {
+export default function InvariantPlot({ series, times, playhead }: Props) {
+  const unit = series.unit;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState<"absolute" | "tolerance">("absolute");
 
   const values = series.values;
   const first = values[0] ?? 0;
-  const drift = relativeDrift(values);
+  // driftOf, not relativeDrift: a series may declare its own scale, and total
+  // momentum in a head-on collision sums to almost zero.
+  const drift = driftOf(series);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -75,7 +77,7 @@ export default function InvariantPlot({ series, times, unit = "J", playhead }: P
         // Centre on the mean and show the pass/fail band, with a floor so a
         // machine-precision-flat series does not divide by zero.
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
-        const band = Math.max(Math.abs(mean) * series.tolerance, 1e-12);
+        const band = Math.max((series.scale ?? Math.abs(mean)) * series.tolerance, 1e-12);
         const spread = Math.max(band, Math.max(...values) - Math.min(...values));
         min = mean - spread * 1.6;
         max = mean + spread * 1.6;
@@ -88,7 +90,7 @@ export default function InvariantPlot({ series, times, unit = "J", playhead }: P
       // Tolerance band, only where it is wide enough to mean anything.
       if (series.law === "conserved") {
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
-        const band = Math.abs(mean) * series.tolerance;
+        const band = (series.scale ?? Math.abs(mean)) * series.tolerance;
         const yTop = toY(mean + band);
         const yBot = toY(mean - band);
         if (yBot - yTop > 1.5) {
@@ -145,10 +147,8 @@ export default function InvariantPlot({ series, times, unit = "J", playhead }: P
     return () => ro.disconnect();
   }, [series, times, values, zoom, playhead, first]);
 
-  const holds =
-    series.law === "conserved"
-      ? drift <= series.tolerance
-      : values.every((v, i) => i === 0 || v <= values[i - 1] + series.tolerance * Math.abs(first));
+  // The same function CI calls. If these two ever disagree, the screen is lying.
+  const holds = invariantHolds(series);
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4">

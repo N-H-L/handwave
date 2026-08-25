@@ -288,12 +288,14 @@ export const freefall: Simulator<FreeFallParams> = {
         xAxis: false,
         ground: 0,
         links: [],
+        segments: [],
         trail: true,
       },
       invariants: [
         {
           key: "energy_j",
           label: "Total mechanical energy",
+          unit: "J",
           law: drag ? "non_increasing" : "conserved",
           values: energy,
           tolerance: 1e-8,

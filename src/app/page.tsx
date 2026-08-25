@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Day 3 harness: three simulators, one generic shell.
+ * Day 4 harness: five simulators, one generic shell.
  *
  * Nothing in this file knows any physics. Controls, idealisation toggles,
- * readouts and axis labels are all read off the simulator's own declarations,
- * so adding sim four and five is a registry entry rather than a UI change —
- * and the LLM's parameter schema and the on-screen sliders cannot drift apart,
- * because they are the same declaration.
+ * readouts, invariant plots and axis labels are all read off the simulator's
+ * own declarations — sims four and five went in without touching a line of
+ * layout — and the LLM's parameter schema and the on-screen sliders cannot
+ * drift apart, because they are the same declaration.
  *
  * The prediction gate (day 5) slots in at the marked seam.
  */
@@ -16,7 +16,9 @@ import { useMemo, useState } from "react";
 import InvariantPlot from "@/components/InvariantPlot";
 import SimCanvas from "@/components/SimCanvas";
 import { REGISTRY, defaultIdealizations, runSpec, type SimId } from "@/lib/sim/registry";
+import { COLLISION_DEFAULTS } from "@/lib/sim/sims/collision";
 import { FREEFALL_DEFAULTS } from "@/lib/sim/sims/freefall";
+import { INCLINE_DEFAULTS } from "@/lib/sim/sims/incline";
 import { PENDULUM_DEFAULTS } from "@/lib/sim/sims/pendulum";
 import { PROJECTILE_DEFAULTS } from "@/lib/sim/sims/projectile";
 
@@ -29,9 +31,11 @@ const DEFAULTS: Record<SimId, Params> = {
   projectile: { ...PROJECTILE_DEFAULTS, speed_m_s: 40 },
   freefall: { ...FREEFALL_DEFAULTS },
   pendulum: { ...PENDULUM_DEFAULTS },
+  collision: { ...COLLISION_DEFAULTS },
+  incline: { ...INCLINE_DEFAULTS },
 };
 
-const SIM_ORDER: SimId[] = ["projectile", "freefall", "pendulum"];
+const SIM_ORDER: SimId[] = ["projectile", "freefall", "pendulum", "collision", "incline"];
 
 /** Presets exist to put the interesting case one click away on camera. */
 const PRESETS: Record<SimId, { label: string; params?: Params; ideal?: Record<string, boolean> }[]> =
@@ -54,6 +58,19 @@ const PRESETS: Record<SimId, { label: string; params?: Params; ideal?: Record<st
       { label: "90°, small-angle formula", params: { release_angle_deg: 90 }, ideal: { small_angle: true } },
       { label: "Nearly inverted, 170°", params: { release_angle_deg: 170 } },
     ],
+    collision: [
+      { label: "Truck hits car", ideal: { perfectly_elastic: false } },
+      { label: "Same crash, elastic", ideal: { perfectly_elastic: true } },
+      { label: "Equal masses", params: { mass_1_kg: 1000, velocity_1_m_s: 15, mass_2_kg: 1000, velocity_2_m_s: -15 }, ideal: { perfectly_elastic: true } },
+      { label: "Stiffer contact", params: { contact_stiffness_n_m: 8e6 } },
+      { label: "Nearly sticking", params: { restitution: 0.02 } },
+    ],
+    incline: [
+      { label: "2 kg block, 30°", params: { mass_kg: 2 } },
+      { label: "20 kg block, 30°", params: { mass_kg: 20 } },
+      { label: "Too shallow to move, 15°", params: { incline_angle_deg: 15 } },
+      { label: "Frictionless", ideal: { friction: false } },
+    ],
   };
 
 /** `impact_speed_m_s` -> { label: "impact speed", unit: "m/s" }. */
@@ -64,6 +81,8 @@ const UNIT_SUFFIXES: [string, string][] = [
   ["_deg", "°"],
   ["_pct", "%"],
   ["_ms", "ms"],
+  ["_ns", "N·s"],
+  ["_n", "N"],
   ["_m2", "m²"],
   ["_kg", "kg"],
   ["_m", "m"],
@@ -94,6 +113,8 @@ export default function Home() {
     projectile: defaultIdealizations("projectile"),
     freefall: defaultIdealizations("freefall"),
     pendulum: defaultIdealizations("pendulum"),
+    collision: defaultIdealizations("collision"),
+    incline: defaultIdealizations("incline"),
   });
   const [runKey, setRunKey] = useState(0);
   const [hasRun, setHasRun] = useState(false);
@@ -114,7 +135,6 @@ export default function Home() {
     () => sim.closedForm(params as any, ideal),
     [sim, params, ideal],
   );
-  const energy = trace.invariants.find((i) => i.key === "energy_j")!;
   const times = useMemo(() => trace.frames.map((f) => f.t), [trace]);
 
   const reset = () => {
@@ -207,7 +227,7 @@ export default function Home() {
               <>
                 <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
                   {Object.entries(trace.outcome)
-                    .filter(([k]) => k !== "landed")
+                    .filter(([k]) => !["landed", "touched", "moved"].includes(k))
                     .map(([k, v]) => {
                       const { label, unit } = splitKey(k);
                       return (
@@ -247,8 +267,10 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mt-4">
-            <InvariantPlot series={energy} times={times} playhead={t} unit="J" />
+          <div className="mt-4 space-y-4">
+            {trace.invariants.map((series) => (
+              <InvariantPlot key={series.key} series={series} times={times} playhead={t} />
+            ))}
           </div>
         </section>
 
