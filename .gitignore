@@ -43,3 +43,6 @@ next-env.d.ts
 # stray fetched pages (research agents drop these)
 *.html
 !docs/*.html
+
+.vercel
+.env*
