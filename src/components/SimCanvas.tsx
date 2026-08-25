@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { INK } from "@/lib/palette";
+import { INK, OKABE_ITO } from "@/lib/palette";
 import type { Trace } from "@/lib/sim/types";
 
 type Props = {
@@ -33,6 +33,12 @@ type Props = {
 
 const PAD = { left: 56, right: 20, top: 20, bottom: 40 };
 const MONO = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+
+/** Direct-labelled series colours, Okabe-Ito order. */
+function bodyColor(i: number): string {
+  const ramp = [OKABE_ITO.blue, OKABE_ITO.vermillion, OKABE_ITO.bluishGreen, OKABE_ITO.orange];
+  return ramp[i % ramp.length];
+}
 
 function niceStep(range: number, target: number): number {
   const raw = range / target;
@@ -75,6 +81,7 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
 
       const plotW = cssW - PAD.left - PAD.right;
       const plotH = cssH - PAD.top - PAD.bottom;
+      const view = trace.view;
       const [dx0, dx1] = trace.domain.x;
       const [dy0, dy1] = trace.domain.y;
 
@@ -98,7 +105,7 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
       const stepX = niceStep(visX, 6);
       const stepY = niceStep(visY, 5);
 
-      for (let gx = dx0; gx <= dx0 + visX + 1e-9; gx += stepX) {
+      if (view.xAxis) for (let gx = dx0; gx <= dx0 + visX + 1e-9; gx += stepX) {
         const [px] = toPx(gx, 0);
         ctx.strokeStyle = INK.grid;
         ctx.beginPath();
@@ -122,22 +129,33 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
         ctx.fillText(String(Number(gy.toFixed(2))), PAD.left - 8, py);
       }
 
-      // Ground.
-      const [, groundY] = toPx(0, 0);
-      ctx.strokeStyle = INK.ground;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(PAD.left, Math.round(groundY) + 0.5);
-      ctx.lineTo(PAD.left + plotW, Math.round(groundY) + 0.5);
-      ctx.stroke();
+      // Ground, only where the simulator says there is one.
+      if (view.ground !== null) {
+        const [, groundY] = toPx(0, view.ground);
+        ctx.strokeStyle = INK.ground;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(PAD.left, Math.round(groundY) + 0.5);
+        ctx.lineTo(PAD.left + plotW, Math.round(groundY) + 0.5);
+        ctx.stroke();
+      }
+
+      // Fixed anchors for any links (a pendulum pivot).
+      ctx.fillStyle = INK.ground;
+      for (const link of view.links) {
+        const [ax, ay] = toPx(link.from.x, link.from.y);
+        ctx.beginPath();
+        ctx.arc(ax, ay, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.fillStyle = INK.label;
       ctx.textAlign = "center";
-      ctx.fillText("horizontal distance (m)", PAD.left + plotW / 2, cssH - 12);
+      ctx.fillText(view.xLabel, PAD.left + plotW / 2, cssH - 12);
       ctx.save();
       ctx.translate(14, PAD.top + plotH / 2);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillText("height (m)", 0, 0);
+      ctx.fillText(view.yLabel, 0, 0);
       ctx.restore();
     };
 
@@ -156,6 +174,7 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
     let start: number | null = null;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const view = trace.view;
     const frames = trace.frames;
     const total = frames[frames.length - 1].t;
 
@@ -164,31 +183,64 @@ export default function SimCanvas({ trace, runKey, playbackRate, onProgress, onD
       if (!g) return;
       ctx.clearRect(0, 0, g.w, g.h);
 
-      ctx.strokeStyle = INK.trail;
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.beginPath();
-
       let last = frames[0];
+      let lastIndex = 0;
       for (let i = 0; i < frames.length; i++) {
-        const f = frames[i];
-        if (f.t > upTo) break;
-        const [px, py] = g.toPx(f.bodies[0].pos.x, f.bodies[0].pos.y);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-        last = f;
+        if (frames[i].t > upTo) break;
+        last = frames[i];
+        lastIndex = i;
       }
-      ctx.stroke();
 
-      const [bx, by] = g.toPx(last.bodies[0].pos.x, last.bodies[0].pos.y);
-      ctx.fillStyle = INK.body;
-      ctx.beginPath();
-      ctx.arc(bx, by, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#ffffff";
+      // One trail per body, so a two-object drop reads as two objects.
+      if (view.trail) {
+        for (let b = 0; b < last.bodies.length; b++) {
+          ctx.strokeStyle = bodyColor(b);
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          for (let i = 0; i <= lastIndex; i++) {
+            const p = frames[i].bodies[b].pos;
+            const [px, py] = g.toPx(p.x, p.y);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+      }
+
+      // Links back to their fixed anchors.
+      ctx.strokeStyle = INK.ground;
       ctx.lineWidth = 1.5;
-      ctx.stroke();
+      for (const link of view.links) {
+        const body = last.bodies[link.toBody];
+        if (!body) continue;
+        const [ax, ay] = g.toPx(link.from.x, link.from.y);
+        const [bx2, by2] = g.toPx(body.pos.x, body.pos.y);
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx2, by2);
+        ctx.stroke();
+      }
+
+      for (let b = 0; b < last.bodies.length; b++) {
+        const [bx, by] = g.toPx(last.bodies[b].pos.x, last.bodies[b].pos.y);
+        ctx.fillStyle = bodyColor(b);
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        if (last.bodies.length > 1) {
+          ctx.fillStyle = bodyColor(b);
+          ctx.font = MONO;
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(last.bodies[b].id, bx + 11, by);
+        }
+      }
 
       onProgress?.(Math.min(upTo, total));
     };

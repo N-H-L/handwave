@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Day 1 harness: a projectile rendered from a plain spec object.
+ * Day 3 harness: three simulators, one generic shell.
  *
- * No model is involved. The spec below is exactly the shape LLM #1 will emit
- * on day 8 — building the consumer first means the generator has a fixed,
- * already-working target to hit rather than the other way round.
+ * Nothing in this file knows any physics. Controls, idealisation toggles,
+ * readouts and axis labels are all read off the simulator's own declarations,
+ * so adding sim four and five is a registry entry rather than a UI change —
+ * and the LLM's parameter schema and the on-screen sliders cannot drift apart,
+ * because they are the same declaration.
  *
  * The prediction gate (day 5) slots in at the marked seam.
  */
@@ -13,71 +15,159 @@
 import { useMemo, useState } from "react";
 import InvariantPlot from "@/components/InvariantPlot";
 import SimCanvas from "@/components/SimCanvas";
-import { getSimulator, runSpec } from "@/lib/sim/registry";
+import { REGISTRY, defaultIdealizations, runSpec, type SimId } from "@/lib/sim/registry";
+import { FREEFALL_DEFAULTS } from "@/lib/sim/sims/freefall";
+import { PENDULUM_DEFAULTS } from "@/lib/sim/sims/pendulum";
 import { PROJECTILE_DEFAULTS } from "@/lib/sim/sims/projectile";
-import type { ProjectileParams } from "@/lib/sim/sims/projectile";
 
 const SLOW = 0.35;
 const FULL = 1;
 
-type Preset = { label: string; params: Partial<ProjectileParams>; air: boolean };
+type Params = Record<string, number>;
 
-const PRESETS: Preset[] = [
-  { label: "Baseball, 45°", params: { speed_m_s: 40, angle_deg: 45 }, air: true },
-  { label: "Same throw, no air", params: { speed_m_s: 40, angle_deg: 45 }, air: false },
-  { label: "Shot put, 40°", params: { speed_m_s: 14, angle_deg: 40, mass_kg: 7.26, area_m2: 0.0113 }, air: true },
-  { label: "Horizontal off a cliff", params: { speed_m_s: 15, angle_deg: 0, launch_height_m: 25 }, air: true },
-  { label: "On the Moon", params: { speed_m_s: 20, angle_deg: 45, gravity_m_s2: 1.62 }, air: false },
+const DEFAULTS: Record<SimId, Params> = {
+  projectile: { ...PROJECTILE_DEFAULTS, speed_m_s: 40 },
+  freefall: { ...FREEFALL_DEFAULTS },
+  pendulum: { ...PENDULUM_DEFAULTS },
+};
+
+const SIM_ORDER: SimId[] = ["projectile", "freefall", "pendulum"];
+
+/** Presets exist to put the interesting case one click away on camera. */
+const PRESETS: Record<SimId, { label: string; params?: Params; ideal?: Record<string, boolean> }[]> =
+  {
+    projectile: [
+      { label: "Baseball, 45°", params: { speed_m_s: 40, angle_deg: 45 }, ideal: { air_resistance: true } },
+      { label: "Same throw, vacuum", params: { speed_m_s: 40, angle_deg: 45 }, ideal: { air_resistance: false } },
+      { label: "Off a cliff", params: { speed_m_s: 15, angle_deg: 0, launch_height_m: 25 } },
+      { label: "On the Moon", params: { speed_m_s: 20, angle_deg: 45, gravity_m_s2: 1.62 }, ideal: { air_resistance: false } },
+    ],
+    freefall: [
+      { label: "Shot put vs baseball", ideal: { air_resistance: true } },
+      { label: "The same drop, vacuum", ideal: { air_resistance: false } },
+      { label: "From 100 m", params: { drop_height_m: 100 }, ideal: { air_resistance: true } },
+      { label: "Two identical balls", params: { mass_b_kg: 7.26, area_b_m2: 0.0113 } },
+    ],
+    pendulum: [
+      { label: "Pulled back 10°", params: { release_angle_deg: 10 } },
+      { label: "Pulled back 90°", params: { release_angle_deg: 90 } },
+      { label: "90°, small-angle formula", params: { release_angle_deg: 90 }, ideal: { small_angle: true } },
+      { label: "Nearly inverted, 170°", params: { release_angle_deg: 170 } },
+    ],
+  };
+
+/** `impact_speed_m_s` -> { label: "impact speed", unit: "m/s" }. */
+const UNIT_SUFFIXES: [string, string][] = [
+  ["_m_s2", "m/s²"],
+  ["_m_s", "m/s"],
+  ["_rad_s", "rad/s"],
+  ["_deg", "°"],
+  ["_pct", "%"],
+  ["_ms", "ms"],
+  ["_m2", "m²"],
+  ["_kg", "kg"],
+  ["_m", "m"],
+  ["_s", "s"],
+  ["_j", "J"],
 ];
 
+function splitKey(key: string): { label: string; unit: string } {
+  for (const [suffix, unit] of UNIT_SUFFIXES) {
+    if (key.endsWith(suffix)) {
+      return { label: key.slice(0, -suffix.length).replace(/_/g, " "), unit };
+    }
+  }
+  return { label: key.replace(/_/g, " "), unit: "" };
+}
+
+function fmt(v: number): string {
+  if (!Number.isFinite(v)) return "—";
+  const abs = Math.abs(v);
+  if (abs !== 0 && (abs < 0.01 || abs >= 1e5)) return v.toExponential(2);
+  return v.toFixed(abs < 10 ? 3 : 2);
+}
+
 export default function Home() {
-  const [params, setParams] = useState<ProjectileParams>({
-    ...PROJECTILE_DEFAULTS,
-    speed_m_s: 40,
+  const [simId, setSimId] = useState<SimId>("projectile");
+  const [allParams, setAllParams] = useState<Record<SimId, Params>>(DEFAULTS);
+  const [allIdeal, setAllIdeal] = useState<Record<SimId, Record<string, boolean>>>({
+    projectile: defaultIdealizations("projectile"),
+    freefall: defaultIdealizations("freefall"),
+    pendulum: defaultIdealizations("pendulum"),
   });
-  const [air, setAir] = useState(true);
   const [runKey, setRunKey] = useState(0);
   const [hasRun, setHasRun] = useState(false);
   const [t, setT] = useState(0);
 
-  const sim = getSimulator("projectile");
+  const sim = REGISTRY[simId];
+  const params = allParams[simId];
+  const ideal = allIdeal[simId];
 
   const spec = useMemo(
-    () => ({
-      sim_id: "projectile" as const,
-      params,
-      idealizations: { air_resistance: air },
-    }),
-    [params, air],
+    () => ({ sim_id: simId, params, idealizations: ideal }),
+    [simId, params, ideal],
   );
 
   const trace = useMemo(() => runSpec(spec), [spec]);
-  const closed = sim.closedForm(params, { air_resistance: air });
+  const closed = useMemo(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    () => sim.closedForm(params as any, ideal),
+    [sim, params, ideal],
+  );
   const energy = trace.invariants.find((i) => i.key === "energy_j")!;
   const times = useMemo(() => trace.frames.map((f) => f.t), [trace]);
 
-  const set = (k: keyof ProjectileParams) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setParams((p) => ({ ...p, [k]: Number(e.target.value) }));
+  const reset = () => {
+    setHasRun(false);
+    setRunKey((k) => k + 1);
+  };
+
+  const setParam = (key: string, value: number) => {
+    setAllParams((p) => ({ ...p, [simId]: { ...p[simId], [key]: value } }));
     setHasRun(false);
   };
 
-  const applyPreset = (p: Preset) => {
-    setParams({ ...PROJECTILE_DEFAULTS, ...p.params });
-    setAir(p.air);
+  const setIdeal = (key: string, value: boolean) => {
+    setAllIdeal((p) => ({ ...p, [simId]: { ...p[simId], [key]: value } }));
+    setHasRun(false);
+  };
+
+  const chooseSim = (id: SimId) => {
+    setSimId(id);
     setHasRun(false);
     setRunKey((k) => k + 1);
   };
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Handwave</h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-          A hand-written, unit-tested simulator driven by a typed spec. The model never writes
-          the physics — on day 8 it will choose this simulator and fill these parameters, and
+          Hand-written, unit-tested simulators driven by a typed spec. The model never writes
+          the physics — on day 8 it will choose one of these and fill in its parameters, and
           nothing else.
         </p>
       </header>
+
+      <nav className="mb-6 flex flex-wrap gap-2" aria-label="Simulation">
+        {SIM_ORDER.map((id) => (
+          <button
+            key={id}
+            onClick={() => chooseSim(id)}
+            aria-current={id === simId ? "page" : undefined}
+            className={
+              "rounded-md px-3 py-1.5 text-sm " +
+              (id === simId
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100")
+            }
+          >
+            {REGISTRY[id].title}
+          </button>
+        ))}
+      </nav>
+
+      <p className="mb-4 text-base text-zinc-800">{sim.question}</p>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <section>
@@ -93,7 +183,7 @@ export default function Home() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setRunKey((k) => k + 1)}
+              onClick={reset}
               className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
             >
               Replay
@@ -106,35 +196,53 @@ export default function Home() {
             </span>
           </div>
 
-          {/* ── seam: the day-5 prediction gate goes here. Until it exists,
-              the outcome is revealed only after the run finishes, so the
-              habit the gate enforces is already the default. ────────────── */}
+          {/* ── seam: the day-5 prediction gate goes here. Until it exists, the
+              outcome is revealed only after the run finishes, so the habit the
+              gate enforces is already the default. ─────────────────────────── */}
           <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               What the simulator computed
             </h2>
             {hasRun ? (
-              <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-                <Readout label="range" value={trace.outcome.range_m} unit="m" />
-                <Readout label="flight time" value={trace.outcome.flight_time_s} unit="s" />
-                <Readout label="apex" value={trace.outcome.apex_m} unit="m" />
-                <Readout label="impact angle" value={trace.outcome.impact_angle_deg} unit="°" />
-              </dl>
+              <>
+                <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                  {Object.entries(trace.outcome)
+                    .filter(([k]) => k !== "landed")
+                    .map(([k, v]) => {
+                      const { label, unit } = splitKey(k);
+                      return (
+                        <div key={k}>
+                          <dt className="text-xs text-zinc-500">{label}</dt>
+                          <dd className="font-mono tabular-nums">
+                            {fmt(v)}
+                            <span className="ml-0.5 text-xs text-zinc-400">
+                              {Number.isFinite(v) ? unit : ""}
+                            </span>
+                          </dd>
+                        </div>
+                      );
+                    })}
+                </dl>
+                {closed && (
+                  <p className="mt-3 border-t border-zinc-200 pt-3 font-mono text-[11px] leading-relaxed tabular-nums text-zinc-500">
+                    closed form:{" "}
+                    {Object.entries(closed)
+                      .filter(([k]) => k in trace.outcome && Number.isFinite(closed[k]))
+                      .map(([k, v]) => {
+                        const err =
+                          v === 0
+                            ? Math.abs(trace.outcome[k])
+                            : Math.abs(trace.outcome[k] - v) / Math.abs(v);
+                        return splitKey(k).label + " " + fmt(v) + " (err " + err.toExponential(1) + ")";
+                      })
+                      .join(" · ")}
+                  </p>
+                )}
+              </>
             ) : (
               <p className="mt-2 text-sm text-zinc-500">
                 Hidden until the run finishes. Reading the answer before you commit to one is
                 the failure mode this whole product exists to prevent.
-              </p>
-            )}
-
-            {hasRun && closed && (
-              <p className="mt-3 border-t border-zinc-200 pt-3 font-mono text-xs tabular-nums text-zinc-500">
-                closed form (vacuum): range {closed.range_m.toFixed(3)} m · integrator error{" "}
-                {(
-                  (Math.abs(trace.outcome.range_m - closed.range_m) / closed.range_m) *
-                  100
-                ).toExponential(1)}
-                %
               </p>
             )}
           </div>
@@ -147,24 +255,49 @@ export default function Home() {
         <aside className="space-y-6">
           <Panel title="Presets">
             <div className="flex flex-wrap gap-1.5">
-              {PRESETS.map((p) => (
+              {PRESETS[simId].map((preset) => (
                 <button
-                  key={p.label}
-                  onClick={() => applyPreset(p)}
+                  key={preset.label}
+                  onClick={() => {
+                    setAllParams((p) => ({
+                      ...p,
+                      [simId]: { ...DEFAULTS[simId], ...(preset.params ?? {}) },
+                    }));
+                    setAllIdeal((p) => ({
+                      ...p,
+                      [simId]: { ...defaultIdealizations(simId), ...(preset.ideal ?? {}) },
+                    }));
+                    reset();
+                  }}
                   className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100"
                 >
-                  {p.label}
+                  {preset.label}
                 </button>
               ))}
             </div>
           </Panel>
 
           <Panel title="Parameters">
-            <Slider label="speed" unit="m/s" min={1} max={100} step={1} value={params.speed_m_s} onChange={set("speed_m_s")} />
-            <Slider label="angle" unit="°" min={-80} max={89} step={1} value={params.angle_deg} onChange={set("angle_deg")} />
-            <Slider label="launch height" unit="m" min={0} max={100} step={1} value={params.launch_height_m} onChange={set("launch_height_m")} />
-            <Slider label="mass" unit="kg" min={0.01} max={10} step={0.01} value={params.mass_kg} onChange={set("mass_kg")} />
-            <Slider label="gravity" unit="m/s²" min={0.5} max={25} step={0.01} value={params.gravity_m_s2} onChange={set("gravity_m_s2")} />
+            {sim.controls.map((c) => (
+              <label key={c.key} className="block">
+                <span className="flex items-baseline justify-between text-xs">
+                  <span className="text-zinc-600">{c.label}</span>
+                  <span className="font-mono tabular-nums text-zinc-900">
+                    {params[c.key]}
+                    <span className="ml-0.5 text-zinc-400">{c.unit}</span>
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min={c.min}
+                  max={c.max}
+                  step={c.step}
+                  value={params[c.key]}
+                  onChange={(e) => setParam(c.key, Number(e.target.value))}
+                  className="mt-1 w-full accent-zinc-900"
+                />
+              </label>
+            ))}
           </Panel>
 
           <Panel title="Idealisations">
@@ -173,17 +306,14 @@ export default function Home() {
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <input
                     type="checkbox"
-                    checked={air}
-                    onChange={(e) => {
-                      setAir(e.target.checked);
-                      setHasRun(false);
-                    }}
+                    checked={ideal[d.key] === true}
+                    onChange={(e) => setIdeal(d.key, e.target.checked)}
                     className="h-4 w-4"
                   />
                   {d.label}
                 </label>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  {air ? d.whenOn : d.whenOff}
+                  {ideal[d.key] ? d.whenOn : d.whenOff}
                 </p>
               </div>
             ))}
@@ -220,56 +350,5 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
       </h2>
       <div className="space-y-3">{children}</div>
     </section>
-  );
-}
-
-function Readout({ label, value, unit }: { label: string; value: number; unit: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-zinc-500">{label}</dt>
-      <dd className="font-mono tabular-nums">
-        {value.toFixed(2)}
-        <span className="ml-0.5 text-xs text-zinc-400">{unit}</span>
-      </dd>
-    </div>
-  );
-}
-
-function Slider({
-  label,
-  unit,
-  min,
-  max,
-  step,
-  value,
-  onChange,
-}: {
-  label: string;
-  unit: string;
-  min: number;
-  max: number;
-  step: number;
-  value: number;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="flex items-baseline justify-between text-xs">
-        <span className="text-zinc-600">{label}</span>
-        <span className="font-mono tabular-nums text-zinc-900">
-          {value}
-          <span className="ml-0.5 text-zinc-400">{unit}</span>
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={onChange}
-        className="mt-1 w-full accent-zinc-900"
-      />
-    </label>
   );
 }

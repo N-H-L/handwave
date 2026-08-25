@@ -16,6 +16,7 @@ import {
 import type {
   Frame,
   IdealizationDef,
+  ParamControl,
   PredictionTarget,
   ResolvedIdealization,
   RunOptions,
@@ -91,6 +92,15 @@ const PREDICTIONS: PredictionTarget[] = [
   },
 ];
 
+const CONTROLS: ParamControl[] = [
+  { key: "speed_m_s", label: "launch speed", unit: "m/s", min: 1, max: 100, step: 1 },
+  { key: "angle_deg", label: "launch angle", unit: "°", min: -80, max: 89, step: 1 },
+  { key: "launch_height_m", label: "launch height", unit: "m", min: 0, max: 100, step: 1 },
+  { key: "mass_kg", label: "mass", unit: "kg", min: 0.01, max: 10, step: 0.01 },
+  { key: "area_m2", label: "frontal area", unit: "m²", min: 0.001, max: 0.2, step: 0.001 },
+  { key: "gravity_m_s2", label: "gravity", unit: "m/s²", min: 0.5, max: 25, step: 0.01 },
+];
+
 function accelFactory(p: ProjectileParams, drag: boolean) {
   const g = p.gravity_m_s2;
   if (!drag) {
@@ -117,6 +127,7 @@ export const projectile: Simulator<ProjectileParams> = {
   validity: VALIDITY,
   idealizations: IDEALIZATIONS,
   predictions: PREDICTIONS,
+  controls: CONTROLS,
 
   closedForm(p, ideal) {
     if (ideal.air_resistance) return null; // no elementary closed form with quadratic drag
@@ -243,6 +254,14 @@ export const projectile: Simulator<ProjectileParams> = {
       dt,
       frames,
       domain: { x: [0, domainX], y: [0, domainY] },
+      view: {
+        xLabel: "horizontal distance (m)",
+        yLabel: "height (m)",
+        xAxis: true,
+        ground: 0,
+        links: [],
+        trail: true,
+      },
       invariants: [
         {
           key: "energy_j",

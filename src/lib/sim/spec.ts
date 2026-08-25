@@ -43,11 +43,49 @@ export const ProjectileSpecSchema = z.object({
   idealizations: ProjectileIdealizationsSchema.optional(),
 });
 
+export const FreeFallParamsSchema = z.object({
+  drop_height_m: z.number().min(0.1).max(2000),
+  mass_a_kg: z.number().min(0.001).max(1000),
+  area_a_m2: z.number().min(1e-6).max(10),
+  mass_b_kg: z.number().min(0.001).max(1000),
+  area_b_m2: z.number().min(1e-6).max(10),
+  drag_coefficient: z.number().min(0.01).max(2),
+  gravity_m_s2: z.number().min(0.1).max(30),
+});
+
+export const FreeFallSpecSchema = z.object({
+  sim_id: z.literal("freefall"),
+  params: FreeFallParamsSchema,
+  idealizations: z.object({ air_resistance: z.boolean() }).optional(),
+});
+
+export const PendulumParamsSchema = z.object({
+  length_m: z.number().min(0.01).max(100),
+  // 180 is excluded, not clamped: balanced exactly upright the period is
+  // infinite, and there is no honest simulation of that to show.
+  release_angle_deg: z.number().min(0.1).max(175),
+  mass_kg: z.number().min(0.001).max(1000),
+  gravity_m_s2: z.number().min(0.1).max(30),
+});
+
+export const PendulumSpecSchema = z.object({
+  sim_id: z.literal("pendulum"),
+  params: PendulumParamsSchema,
+  idealizations: z.object({ small_angle: z.boolean() }).optional(),
+});
+
 /**
  * Add each new simulator here as a member. The union is closed by
  * construction: a model cannot name a simulator that does not exist.
+ *
+ * Adding a member here without adding a case to runSpec's switch is a compile
+ * error, by design — see registry.ts.
  */
-export const SimSpecSchema = z.discriminatedUnion("sim_id", [ProjectileSpecSchema]);
+export const SimSpecSchema = z.discriminatedUnion("sim_id", [
+  ProjectileSpecSchema,
+  FreeFallSpecSchema,
+  PendulumSpecSchema,
+]);
 
 export type SimSpec = z.infer<typeof SimSpecSchema>;
 export type SimId = SimSpec["sim_id"];

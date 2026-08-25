@@ -101,3 +101,50 @@ export function invariantHolds(inv: InvariantSeries): boolean {
   }
   return true;
 }
+
+// ── one-dimensional variants ────────────────────────────────────────────────
+// A pendulum's state is an angle and an angular velocity; an inclined-plane
+// block's is a distance along the slope. Forcing those through the 2-vector
+// path would mean carrying a dead component and pretending it means something.
+
+export type Accel1D = (x: number, v: number, t: number) => number;
+
+export type VerletState1D = { x: number; v: number; a: number };
+
+export function initVerlet1D(x: number, v: number, accel: Accel1D, t = 0): VerletState1D {
+  return { x, v, a: accel(x, v, t) };
+}
+
+export function verletStep1D(
+  s: VerletState1D,
+  dt: number,
+  accel: Accel1D,
+  t: number,
+): VerletState1D {
+  const x = s.x + s.v * dt + 0.5 * s.a * dt * dt;
+  const vPredicted = s.v + s.a * dt;
+  const a = accel(x, vPredicted, t + dt);
+  const v = s.v + 0.5 * (s.a + a) * dt;
+  return { x, v, a };
+}
+
+/**
+ * Complete elliptic integral of the first kind, K(m), by the
+ * arithmetic-geometric mean.
+ *
+ * AGM converges quadratically — six or seven iterations reach machine
+ * precision — which is why the exact large-amplitude pendulum period is
+ * something we can assert against rather than approximate. m = k^2.
+ */
+export function ellipticK(m: number): number {
+  if (m < 0 || m >= 1) throw new RangeError("ellipticK needs m in [0, 1)");
+  let a = 1;
+  let b = Math.sqrt(1 - m);
+  for (let i = 0; i < 60; i++) {
+    if (Math.abs(a - b) < 1e-16 * Math.abs(a)) break;
+    const nextA = (a + b) / 2;
+    b = Math.sqrt(a * b);
+    a = nextA;
+  }
+  return Math.PI / (2 * a);
+}

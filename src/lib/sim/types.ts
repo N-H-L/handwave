@@ -49,6 +49,46 @@ export type InvariantSeries = {
   active: boolean;
 };
 
+/**
+ * What the renderer needs in order to draw this trace without knowing which
+ * simulator produced it.
+ *
+ * A projectile wants a ground line and a trail; a pendulum wants a rod back to
+ * its pivot and no trail at all, because an oscillator that leaves a trail just
+ * paints over its own arc. Rather than branch on `simId` in the renderer — which
+ * would put physics knowledge in the drawing layer and guarantee it rots — each
+ * simulator declares how it should be read.
+ */
+export type View = {
+  xLabel: string;
+  yLabel: string;
+  /**
+   * Draw the x grid and tick labels. False for a straight vertical drop, where
+   * the horizontal placement is only there to stop the two objects overlapping
+   * and labelling it in metres would be inventing a measurement.
+   */
+  xAxis: boolean;
+  /** World y at which to draw a ground line, or null for none. */
+  ground: number | null;
+  /** Rigid connections drawn every frame: a pendulum rod, a spring. */
+  links: { from: Vec2; toBody: number }[];
+  /** Leave the path behind the body. Wrong for anything that retraces itself. */
+  trail: boolean;
+};
+
+/**
+ * A parameter the student (or LLM #1) can set, declared once so the UI
+ * controls and the schema bounds cannot drift apart.
+ */
+export type ParamControl = {
+  key: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+};
+
 /** The result of one deterministic run. Everything downstream reads only this. */
 export type Trace = {
   simId: string;
@@ -56,6 +96,7 @@ export type Trace = {
   frames: Frame[];
   invariants: InvariantSeries[];
   domain: Domain;
+  view: View;
   /**
    * Named semantic outcomes — never re-derived by the renderer or the
    * explainer. LLM #2 is grounded in exactly these numbers (PLAN §2).
@@ -129,6 +170,7 @@ export interface Simulator<P> {
   validity: ValidityRange;
   idealizations: IdealizationDef[];
   predictions: PredictionTarget[];
+  controls: ParamControl[];
   run(params: P, idealizations: Record<string, boolean>, opts?: RunOptions): Trace;
   /**
    * Closed-form answer for the idealized case. Exists so `npm test` can assert

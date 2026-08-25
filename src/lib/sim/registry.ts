@@ -11,12 +11,16 @@
  * instead of a runtime one.
  */
 
+import { freefall } from "./sims/freefall";
+import { pendulum } from "./sims/pendulum";
 import { projectile } from "./sims/projectile";
 import { SimSpecSchema, type SimSpec } from "./spec";
 import type { Trace } from "./types";
 
 export const REGISTRY = {
   projectile,
+  freefall,
+  pendulum,
 } as const;
 
 export type SimId = keyof typeof REGISTRY;
@@ -46,11 +50,15 @@ export function runSpec(input: unknown): Trace {
   switch (spec.sim_id) {
     case "projectile":
       return projectile.run(spec.params, ideal);
+    case "freefall":
+      return freefall.run(spec.params, ideal);
+    case "pendulum":
+      return pendulum.run(spec.params, ideal);
     default: {
       // Exhaustiveness guard: adding a member to SimSpecSchema without adding
       // a case here will not compile.
-      const unreachable: never = spec.sim_id;
-      throw new Error("No simulator registered for " + String(unreachable));
+      const unreachable: never = spec;
+      throw new Error("No simulator registered for " + JSON.stringify(unreachable));
     }
   }
 }
