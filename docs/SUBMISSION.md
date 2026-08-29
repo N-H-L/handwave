@@ -185,6 +185,15 @@ Three decision gates, in order, each cheap and none requiring more product:
 at full marks. Audience questions go through the same path, and a failed route
 shows the honest refusal — which is worth showing.
 
+## Live URL
+
+**https://handwave-app.vercel.app**
+
+⚠️ Updating it is currently awkward — see the deploy note in the README. The
+CLI deploys a fresh Vercel project exactly once and then stalls forever.
+Connect the GitHub repo in the Vercel dashboard before you need to push a
+change under time pressure.
+
 ## Pre-submission checklist
 
 - [ ] `npm test` green (332), `npm run lint` clean, `npm run build` clean

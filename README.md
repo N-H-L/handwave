@@ -1,6 +1,6 @@
 # Handwave
 
-**Live: https://handwave-demo.vercel.app**
+**Live: https://handwave-app.vercel.app**
 
 You ask a physics question. A simulation appears — and the Run button is locked
 until you write down what you think will happen. Then it runs, your prediction
@@ -88,6 +88,18 @@ explanation to quote a number the simulation never produced.
 Without `GEMINI_API_KEY` the app falls back to a deterministic keyword router
 and says so. The simulations and their guarantees are identical either way;
 only the quality of the match degrades.
+
+## Deploying, and a Vercel quirk worth knowing
+
+The `vercel` CLI reproducibly deploys a project ONCE. The first deployment to
+a fresh project builds in 30–45 s; every subsequent one uploads fine, creates
+a deployment record, and then sits at `Building…` forever with no build logs at
+all. Confirmed across three separate projects, with an empty queue and a clean
+408 KB upload.
+
+Two dead projects (`handwave`, `handwave-demo`) are the evidence. Until it is
+diagnosed, the reliable path is **connecting the GitHub repo in the Vercel
+dashboard** so builds run from git rather than from a CLI upload.
 
 ## Develop
 
