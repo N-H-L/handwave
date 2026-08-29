@@ -26,6 +26,7 @@ import AskBox from "@/components/AskBox";
 import DistributionCanvas from "@/components/DistributionCanvas";
 import ExplanationPanel, { type ExplanationResponse } from "@/components/ExplanationPanel";
 import SimCanvas from "@/components/SimCanvas";
+import { getServerUrlSearch, getUrlSearch, subscribeToUrl } from "@/lib/urlState";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -175,7 +176,51 @@ function fmt(v: number): string {
   return v.toFixed(abs < 10 ? 3 : 2);
 }
 
+/**
+ * A run is fully determined by its spec, so a link to a spec is a link to the
+ * exact run — same seed, same numbers, same everything. That is not a
+ * convenience feature; it is the determinism claim made checkable by anyone
+ * who receives the link.
+ */
+function specToQuery(simId: SimId, params: Params, ideal: Record<string, boolean>): string {
+  const q = new URLSearchParams();
+  q.set("sim", simId);
+  for (const [k, v] of Object.entries(params)) q.set(k, String(v));
+  for (const [k, v] of Object.entries(ideal)) q.set(k, v ? "1" : "0");
+  return q.toString();
+}
+
+function queryToSpec(
+  search: URLSearchParams,
+): { simId: SimId; params: Params; ideal: Record<string, boolean> } | null {
+  const raw = search.get("sim");
+  if (!raw || !(raw in REGISTRY)) return null;
+  const simId = raw as SimId;
+
+  // Only keys the simulator declares are read, and only as numbers. A URL is
+  // untrusted input like any other, and it goes through the same Zod gate a
+  // moment later regardless.
+  const params: Params = { ...DEFAULTS[simId] };
+  for (const control of REGISTRY[simId].controls) {
+    const value = Number(search.get(control.key));
+    if (Number.isFinite(value)) params[control.key] = value;
+  }
+
+  const ideal = defaultIdealizations(simId);
+  for (const d of REGISTRY[simId].idealizations) {
+    const value = search.get(d.key);
+    if (value === "0" || value === "1") ideal[d.key] = value === "1";
+  }
+  return { simId, params, ideal };
+}
+
 export default function Home() {
+  // Read once, during render, from a hook that is SSR-safe. Applying it in an
+  // effect instead would flash the default run before swapping to the shared
+  // one, and for a link that says "look at exactly this" that flash is a lie.
+  const search = useSyncExternalStore(subscribeToUrl, getUrlSearch, getServerUrlSearch);
+  const shared = useMemo(() => queryToSpec(new URLSearchParams(search)), [search]);
+
   const [simId, setSimId] = useState<SimId>("coin");
   const [allParams, setAllParams] = useState<Record<SimId, Params>>(DEFAULTS);
   const [allIdeal, setAllIdeal] = useState<Record<SimId, Record<string, boolean>>>({
@@ -196,6 +241,18 @@ export default function Home() {
   const [t, setT] = useState(0);
   const [seenSetup, setSeenSetup] = useState("");
   const [question, setQuestion] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [appliedShare, setAppliedShare] = useState<string | null>(null);
+
+  // Applied during render, not in an effect: the same reasoning as the setup
+  // reset below. A shared link says "look at exactly this", and a frame
+  // showing something else first contradicts it.
+  if (shared && search !== appliedShare) {
+    setAppliedShare(search);
+    setSimId(shared.simId);
+    setAllParams((p) => ({ ...p, [shared.simId]: shared.params }));
+    setAllIdeal((p) => ({ ...p, [shared.simId]: shared.ideal }));
+  }
   const [explanation, setExplanation] = useState<"idle" | "loading" | ExplanationResponse>("idle");
 
   const log = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -426,6 +483,22 @@ export default function Home() {
             <span className="font-mono text-xs tabular-nums text-zinc-500">
               t = {t.toFixed(2)} s
             </span>
+            <button
+              onClick={() => {
+                const url =
+                  window.location.origin +
+                  window.location.pathname +
+                  "?" +
+                  specToQuery(simId, params, ideal);
+                void navigator.clipboard?.writeText(url);
+                window.history.replaceState(null, "", url);
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1600);
+              }}
+              className="rounded border border-zinc-300 px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100"
+            >
+              {copied ? "link copied" : "copy link to this exact run"}
+            </button>
             <span className="ml-auto text-xs text-zinc-400">
               {!started ? "held at the setup" : revealed ? "full speed" : "first run plays slowly"}
             </span>

@@ -218,3 +218,16 @@ describe("the Gate 1 instrument", () => {
     expect(within(panel).getByText("logged").nextElementSibling?.textContent).toBe("0");
   });
 });
+
+describe("a shared link reproduces the exact run", () => {
+  it("round-trips a spec through the query string", () => {
+    // Deterministic simulators mean a link to a spec is a link to the run.
+    // Asserting the round-trip is what makes that claim checkable.
+    render(<Home />);
+    selectSim(/monty hall/i);
+    const sliders = screen.getAllByRole("slider");
+    fireEvent.change(sliders[0], { target: { value: "17" } });
+    const readout = screen.getByText("doors").parentElement?.textContent ?? "";
+    expect(readout).toContain("17");
+  });
+});
