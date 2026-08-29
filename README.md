@@ -1,5 +1,7 @@
 # Handwave
 
+**Live: https://handwave-demo.vercel.app**
+
 You ask a physics question. A simulation appears — and the Run button is locked
 until you write down what you think will happen. Then it runs, your prediction
 stays on screen beside the outcome, and the explanation names the place where
@@ -34,7 +36,8 @@ path for questions nothing in the registry can answer honestly.
 | Day 5 | ✅ The prediction gate |
 | Day 6–7 | ✅ Probability sims — Konold's coin item, law of large numbers, Monty Hall |
 | Day 8–9 | ✅ LLM routing and explanation, with a grounding check |
-| Day 10–11 | Polish, record, submit |
+| Day 10 | ✅ Shareable deterministic run links, prerender fix |
+| Day 11 | Submission copy written — [`docs/SUBMISSION.md`](docs/SUBMISSION.md). Video and Devpost form are yours. |
 
 **Deliberately cut:** the Galton board. The plan listed four probability sims;
 three were built. The board's binomial is already on screen as the second
