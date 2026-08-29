@@ -21,6 +21,13 @@ export type Frame = {
   bodies: BodyState[];
   /** Named scalars a sim wants plotted or read out (energy, speed, ...). */
   scalars: Record<string, number>;
+  /**
+   * Counted outcomes so far, for kind "histogram". Plural because the point of
+   * Konold's coin item is the CONTRAST between two distributions computed from
+   * the same trials: specific five-flip sequences are equally likely, and the
+   * number of heads is not.
+   */
+  histograms?: Histogram[];
 };
 
 /**
@@ -68,7 +75,55 @@ export type InvariantSeries = {
  * would put physics knowledge in the drawing layer and guarantee it rots — each
  * simulator declares how it should be read.
  */
+/**
+ * A counted distribution at one instant of a run.
+ *
+ * PLAN §3 rule 8: probability sims show the DISTRIBUTION, not the trajectory.
+ * A single run of a random process teaches nothing and actively misleads — a
+ * gambler's-fallacy student who predicts "tails is due" and then sees tails
+ * has been rewarded by the simulation for a false belief. Only the shape over
+ * many trials can be argued with.
+ */
+export type Histogram = {
+  label: string;
+  binLabels: string[];
+  counts: number[];
+  /** Theoretical expectation per bin, drawn as a reference line. */
+  expected?: number[];
+  /** Bars to draw in the highlight colour — the ones under discussion. */
+  emphasis?: number[];
+};
+
+/** A named scalar tracked across a run, for the convergence plots. */
+export type SeriesSpec = {
+  key: string;
+  label: string;
+  unit: string;
+  /** Horizontal reference line: the value being converged to, where there is one. */
+  reference?: number;
+  referenceLabel?: string;
+  /** Force the y-domain rather than fitting it to the data. */
+  domain?: [number, number];
+  /**
+   * A second scalar drawn in the same axes for comparison — how the count
+   * difference between heads and tails tracks the square root of the number of
+   * flips, for instance. One line is a measurement; two make an argument.
+   */
+  companion?: { key: string; label: string };
+};
+
 export type View = {
+  /**
+   * How to read this trace.
+   *  world     — bodies in space; the mechanics sims.
+   *  histogram — counted outcomes over many trials.
+   *  series    — named scalars against trial number.
+   */
+  kind: "world" | "histogram" | "series";
+  /** Only for kind "series". */
+  series?: SeriesSpec[];
+  /** Scalar to use as the x axis for kind "series". Defaults to trials_done. */
+  seriesX?: { key: string; label: string };
   xLabel: string;
   yLabel: string;
   /**

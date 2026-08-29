@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 import { REGISTRY, defaultIdealizations, type SimId } from "./registry";
 import { COLLISION_DEFAULTS } from "./sims/collision";
 import { FREEFALL_DEFAULTS } from "./sims/freefall";
+import { COIN_DEFAULTS } from "./sims/coin";
 import { INCLINE_DEFAULTS } from "./sims/incline";
+import { LAWOFLARGE_DEFAULTS } from "./sims/lawoflarge";
+import { MONTYHALL_DEFAULTS } from "./sims/montyhall";
 import { PENDULUM_DEFAULTS } from "./sims/pendulum";
 import { PROJECTILE_DEFAULTS } from "./sims/projectile";
 
@@ -21,6 +24,9 @@ const DEFAULTS: Record<SimId, Record<string, number>> = {
   pendulum: { ...PENDULUM_DEFAULTS },
   collision: { ...COLLISION_DEFAULTS },
   incline: { ...INCLINE_DEFAULTS },
+  coin: { ...COIN_DEFAULTS },
+  lawoflarge: { ...LAWOFLARGE_DEFAULTS },
+  montyhall: { ...MONTYHALL_DEFAULTS },
 };
 
 const IDS = Object.keys(REGISTRY) as SimId[];

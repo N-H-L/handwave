@@ -398,6 +398,7 @@ export const collision: Simulator<CollisionParams> = {
         y: [-halfWidth * 0.28, halfWidth * 0.28],
       },
       view: {
+        kind: "world",
         xLabel: "position (m)",
         yLabel: "",
         xAxis: true,

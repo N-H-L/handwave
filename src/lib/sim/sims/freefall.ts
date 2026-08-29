@@ -292,6 +292,7 @@ export const freefall: Simulator<FreeFallParams> = {
       frames,
       domain: { x: [-h * 0.35, h * 0.35], y: [0, h * 1.08] },
       view: {
+        kind: "world",
         xLabel: "",
         yLabel: "height (m)",
         xAxis: false,

@@ -270,6 +270,7 @@ export const incline: Simulator<InclineParams> = {
         y: [-height * 0.08, Math.max(height * 1.12, L * 0.1)],
       },
       view: {
+        kind: "world",
         xLabel: "horizontal distance (m)",
         yLabel: "height (m)",
         xAxis: true,

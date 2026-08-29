@@ -271,6 +271,7 @@ export const projectile: Simulator<ProjectileParams> = {
       frames,
       domain: { x: [0, domainX], y: [0, domainY] },
       view: {
+        kind: "world",
         xLabel: "horizontal distance (m)",
         yLabel: "height (m)",
         xAxis: true,

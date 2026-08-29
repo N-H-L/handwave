@@ -22,6 +22,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import InvariantPlot from "@/components/InvariantPlot";
 import PredictionGate, { type Commitment, wordCount } from "@/components/PredictionGate";
+import DistributionCanvas from "@/components/DistributionCanvas";
 import SimCanvas from "@/components/SimCanvas";
 import {
   getServerSnapshot,
@@ -31,9 +32,12 @@ import {
   summarise,
 } from "@/lib/predictionLog";
 import { REGISTRY, defaultIdealizations, runSpec, type SimId } from "@/lib/sim/registry";
+import { COIN_DEFAULTS } from "@/lib/sim/sims/coin";
 import { COLLISION_DEFAULTS } from "@/lib/sim/sims/collision";
 import { FREEFALL_DEFAULTS } from "@/lib/sim/sims/freefall";
 import { INCLINE_DEFAULTS } from "@/lib/sim/sims/incline";
+import { LAWOFLARGE_DEFAULTS } from "@/lib/sim/sims/lawoflarge";
+import { MONTYHALL_DEFAULTS } from "@/lib/sim/sims/montyhall";
 import { PENDULUM_DEFAULTS } from "@/lib/sim/sims/pendulum";
 import { PROJECTILE_DEFAULTS } from "@/lib/sim/sims/projectile";
 
@@ -48,9 +52,25 @@ const DEFAULTS: Record<SimId, Params> = {
   pendulum: { ...PENDULUM_DEFAULTS },
   collision: { ...COLLISION_DEFAULTS },
   incline: { ...INCLINE_DEFAULTS },
+  coin: { ...COIN_DEFAULTS },
+  lawoflarge: { ...LAWOFLARGE_DEFAULTS },
+  montyhall: { ...MONTYHALL_DEFAULTS },
 };
 
-const SIM_ORDER: SimId[] = ["projectile", "freefall", "pendulum", "collision", "incline"];
+/**
+ * Konold's coin item leads, because it is the fastest demonstration that a
+ * correct answer and a correct belief are different things — see coin.ts.
+ */
+const SIM_ORDER: SimId[] = [
+  "coin",
+  "lawoflarge",
+  "montyhall",
+  "projectile",
+  "freefall",
+  "pendulum",
+  "collision",
+  "incline",
+];
 
 /** Presets exist to put the interesting case one click away on camera. */
 const PRESETS: Record<SimId, { label: string; params?: Params; ideal?: Record<string, boolean> }[]> =
@@ -86,6 +106,24 @@ const PRESETS: Record<SimId, { label: string; params?: Params; ideal?: Record<st
       { label: "Too shallow to move, 15°", params: { incline_angle_deg: 15 } },
       { label: "Frictionless", ideal: { friction: false } },
     ],
+    coin: [
+      { label: "1,000 sets, fair coin" },
+      { label: "20,000 sets", params: { trials: 20000 } },
+      { label: "Weighted coin, p=0.7", params: { p_heads: 0.7 }, ideal: { fair_coin: false } },
+      { label: "Another seed", params: { seed: 7 } },
+    ],
+    lawoflarge: [
+      { label: "10,000 flips" },
+      { label: "200,000 flips", params: { flips: 200000 } },
+      { label: "Watch runs of 6", params: { streak_length: 6, flips: 200000 } },
+      { label: "Sticky flips", ideal: { independent_flips: false } },
+    ],
+    montyhall: [
+      { label: "3 doors, host knows" },
+      { label: "3 doors, host guessing", ideal: { host_knows: false } },
+      { label: "100 doors", params: { doors: 100 } },
+      { label: "100 doors, guessing", params: { doors: 100 }, ideal: { host_knows: false } },
+    ],
   };
 
 /** `impact_speed_m_s` -> { label: "impact speed", unit: "m/s" }. */
@@ -106,7 +144,17 @@ const UNIT_SUFFIXES: [string, string][] = [
 ];
 
 /** Internal flags and inputs echoed back; not results the student asked for. */
-const HIDDEN_OUTCOMES = ["landed", "touched", "moved", "launch_angle_deg", "release_angle_deg"];
+const HIDDEN_OUTCOMES = [
+  "landed",
+  "touched",
+  "moved",
+  "launch_angle_deg",
+  "release_angle_deg",
+  "doors",
+  "trials_run",
+  "flips_run",
+  "games_played",
+];
 
 function splitKey(key: string): { label: string; unit: string } {
   for (const [suffix, unit] of UNIT_SUFFIXES) {
@@ -125,7 +173,7 @@ function fmt(v: number): string {
 }
 
 export default function Home() {
-  const [simId, setSimId] = useState<SimId>("projectile");
+  const [simId, setSimId] = useState<SimId>("coin");
   const [allParams, setAllParams] = useState<Record<SimId, Params>>(DEFAULTS);
   const [allIdeal, setAllIdeal] = useState<Record<SimId, Record<string, boolean>>>({
     projectile: defaultIdealizations("projectile"),
@@ -133,6 +181,9 @@ export default function Home() {
     pendulum: defaultIdealizations("pendulum"),
     collision: defaultIdealizations("collision"),
     incline: defaultIdealizations("incline"),
+    coin: defaultIdealizations("coin"),
+    lawoflarge: defaultIdealizations("lawoflarge"),
+    montyhall: defaultIdealizations("montyhall"),
   });
 
   const [committed, setCommitted] = useState<Commitment | null>(null);
@@ -257,16 +308,32 @@ export default function Home() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <section>
-          <div className="relative h-[26rem] w-full rounded-lg border border-zinc-200 bg-white">
-            <SimCanvas
-              trace={trace}
-              runKey={runKey}
-              playbackRate={revealed ? FULL : SLOW}
-              frozen={!started}
-              ghost={ghost}
-              onProgress={setT}
-              onDone={() => setRevealed(true)}
-            />
+          <div
+            className={
+              "relative w-full rounded-lg border border-zinc-200 bg-white " +
+              (trace.view.kind === "world" ? "h-[26rem]" : "h-[30rem]")
+            }
+          >
+            {trace.view.kind === "world" ? (
+              <SimCanvas
+                trace={trace}
+                runKey={runKey}
+                playbackRate={revealed ? FULL : SLOW}
+                frozen={!started}
+                ghost={ghost}
+                onProgress={setT}
+                onDone={() => setRevealed(true)}
+              />
+            ) : (
+              <DistributionCanvas
+                trace={trace}
+                runKey={runKey}
+                playbackRate={revealed ? FULL : SLOW}
+                frozen={!started}
+                onProgress={setT}
+                onDone={() => setRevealed(true)}
+              />
+            )}
             {!started && (
               <div className="pointer-events-none absolute left-3 top-3 rounded bg-zinc-900/85 px-2 py-1 text-[11px] font-medium text-white">
                 {committed ? "ready to run" : "the setup — not running yet"}
@@ -352,7 +419,7 @@ export default function Home() {
             </div>
           )}
 
-          {revealed && (
+          {revealed && trace.invariants.length > 0 && (
             <div className="mt-4 space-y-4">
               {trace.invariants.map((series) => (
                 <InvariantPlot key={series.key} series={series} times={times} playhead={t} />

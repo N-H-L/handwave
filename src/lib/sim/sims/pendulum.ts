@@ -242,6 +242,7 @@ export const pendulum: Simulator<PendulumParams> = {
       frames,
       domain: { x: [-reach, reach], y: [-reach, L * 0.15] },
       view: {
+        kind: "world",
         xLabel: "",
         yLabel: "",
         xAxis: false,

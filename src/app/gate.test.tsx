@@ -22,6 +22,15 @@ function commitButton() {
   return screen.getByRole("button", { name: /commit prediction|answer everything/i });
 }
 
+/**
+ * Switch simulations. The tests name the sim they drive rather than relying on
+ * whichever one happens to be first — that ordering is a presentation choice
+ * and it has already changed once.
+ */
+function selectSim(name: RegExp) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 /** Fill in every prediction field for whichever sim is showing. */
 function fillPrediction(rationale = "because the air pushes back on it the whole way") {
   for (const input of screen.queryAllByRole("spinbutton")) {
@@ -60,10 +69,18 @@ describe("the gate is closed on arrival", () => {
 
   it("does not reveal any computed result before a prediction", () => {
     render(<Home />);
+    selectSim(/projectile launch/i);
     // The projectile lands at 95.09 m by default. That number must not be
     // anywhere on the page yet, in any rounding.
     expect(document.body.textContent).not.toMatch(/95\.0/);
     expect(screen.queryByText(/what you said, and what happened/i)).toBeNull();
+  });
+
+  it("hides the counted outcome of a probability sim too", () => {
+    render(<Home />);
+    selectSim(/five coin flips/i);
+    expect(screen.queryByText(/what the simulator computed/i)).toBeNull();
+    expect(screen.getByText(/the setup — not running yet/i)).toBeTruthy();
   });
 });
 
@@ -143,7 +160,7 @@ describe("changing the setup voids the prediction", () => {
     fillPrediction();
     fireEvent.click(commitButton());
 
-    fireEvent.click(screen.getByRole("button", { name: /on the moon/i }));
+    fireEvent.click(screen.getByRole("button", { name: /another seed/i }));
     expect(runButton()).toBeDisabled();
   });
 
@@ -167,6 +184,9 @@ describe("changing the setup voids the prediction", () => {
 
 describe("every simulator puts its own questions behind the gate", () => {
   const titles = [
+    /five coin flips/i,
+    /long runs of a coin/i,
+    /monty hall/i,
     /projectile launch/i,
     /two objects dropped together/i,
     /simple pendulum/i,

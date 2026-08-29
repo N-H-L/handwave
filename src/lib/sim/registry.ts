@@ -11,9 +11,12 @@
  * instead of a runtime one.
  */
 
+import { coin } from "./sims/coin";
 import { collision } from "./sims/collision";
 import { freefall } from "./sims/freefall";
 import { incline } from "./sims/incline";
+import { lawOfLarge } from "./sims/lawoflarge";
+import { montyHall } from "./sims/montyhall";
 import { pendulum } from "./sims/pendulum";
 import { projectile } from "./sims/projectile";
 import { SimSpecSchema, type SimSpec } from "./spec";
@@ -25,6 +28,9 @@ export const REGISTRY = {
   pendulum,
   collision,
   incline,
+  coin,
+  lawoflarge: lawOfLarge,
+  montyhall: montyHall,
 } as const;
 
 export type SimId = keyof typeof REGISTRY;
@@ -62,6 +68,12 @@ export function runSpec(input: unknown): Trace {
       return collision.run(spec.params, ideal);
     case "incline":
       return incline.run(spec.params, ideal);
+    case "coin":
+      return coin.run(spec.params, ideal);
+    case "lawoflarge":
+      return lawOfLarge.run(spec.params, ideal);
+    case "montyhall":
+      return montyHall.run(spec.params, ideal);
     default: {
       // Exhaustiveness guard: adding a member to SimSpecSchema without adding
       // a case here will not compile.

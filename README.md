@@ -32,9 +32,15 @@ path for questions nothing in the registry can answer honestly.
 | Day 2 | ✅ Invariant plots, seeded PRNG |
 | Day 3–4 | ✅ Four more mechanics sims — free fall, pendulum, collision, ramp |
 | Day 5 | ✅ The prediction gate |
-| Day 6–7 | Probability sims |
+| Day 6–7 | ✅ Probability sims — Konold's coin item, law of large numbers, Monty Hall |
 | Day 8–9 | LLM routing and explanation |
 | Day 10–11 | Polish, record, submit |
+
+**Deliberately cut:** the Galton board. The plan listed four probability sims;
+three were built. The board's binomial is already on screen as the second
+histogram of the coin item, so the fourth sim would have added a second view of
+a distribution the app already shows rather than a fourth misconception. Eight
+verified simulators is inside the 8–12 the adversarial review recommended.
 
 Full plan: [`docs/PLAN.md`](docs/PLAN.md). The eleven research reports behind it,
 including the fact-check corrections and the adversarial review that overrides

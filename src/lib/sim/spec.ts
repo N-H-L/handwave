@@ -108,6 +108,52 @@ export const InclineSpecSchema = z.object({
   idealizations: z.object({ friction: z.boolean() }).optional(),
 });
 
+// ── probability ────────────────────────────────────────────────────────────
+// Seeds are numbers rather than strings so a spec stays a flat bag of numbers
+// the routing model can fill without inventing formats. The simulator hashes
+// it together with the other parameters, so a seed of 1 means a different run
+// for each sim rather than the same one everywhere.
+
+export const CoinParamsSchema = z.object({
+  trials: z.number().int().min(1).max(200000),
+  p_heads: z.number().min(0.01).max(0.99),
+  seed: z.number().int().min(0).max(1e6),
+});
+
+export const CoinSpecSchema = z.object({
+  sim_id: z.literal("coin"),
+  params: CoinParamsSchema,
+  idealizations: z.object({ fair_coin: z.boolean() }).optional(),
+});
+
+export const LawOfLargeParamsSchema = z.object({
+  flips: z.number().int().min(10).max(2000000),
+  p_heads: z.number().min(0.01).max(0.99),
+  streak_length: z.number().int().min(1).max(12),
+  seed: z.number().int().min(0).max(1e6),
+});
+
+export const LawOfLargeSpecSchema = z.object({
+  sim_id: z.literal("lawoflarge"),
+  params: LawOfLargeParamsSchema,
+  idealizations: z
+    .object({ fair_coin: z.boolean(), independent_flips: z.boolean() })
+    .partial()
+    .optional(),
+});
+
+export const MontyHallParamsSchema = z.object({
+  doors: z.number().int().min(3).max(1000),
+  trials: z.number().int().min(1).max(200000),
+  seed: z.number().int().min(0).max(1e6),
+});
+
+export const MontyHallSpecSchema = z.object({
+  sim_id: z.literal("montyhall"),
+  params: MontyHallParamsSchema,
+  idealizations: z.object({ host_knows: z.boolean() }).optional(),
+});
+
 /**
  * Add each new simulator here as a member. The union is closed by
  * construction: a model cannot name a simulator that does not exist.
@@ -121,6 +167,9 @@ export const SimSpecSchema = z.discriminatedUnion("sim_id", [
   PendulumSpecSchema,
   CollisionSpecSchema,
   InclineSpecSchema,
+  CoinSpecSchema,
+  LawOfLargeSpecSchema,
+  MontyHallSpecSchema,
 ]);
 
 export type SimSpec = z.infer<typeof SimSpecSchema>;
