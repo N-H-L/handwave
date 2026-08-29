@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "eval:routing": "vitest run --config vitest.eval.mts"
   },
   "dependencies": {
     "next": "16.3.3",

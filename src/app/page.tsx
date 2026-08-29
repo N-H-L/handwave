@@ -22,7 +22,9 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import InvariantPlot from "@/components/InvariantPlot";
 import PredictionGate, { type Commitment, wordCount } from "@/components/PredictionGate";
+import AskBox from "@/components/AskBox";
 import DistributionCanvas from "@/components/DistributionCanvas";
+import ExplanationPanel, { type ExplanationResponse } from "@/components/ExplanationPanel";
 import SimCanvas from "@/components/SimCanvas";
 import {
   getServerSnapshot,
@@ -32,6 +34,7 @@ import {
   summarise,
 } from "@/lib/predictionLog";
 import { REGISTRY, defaultIdealizations, runSpec, type SimId } from "@/lib/sim/registry";
+import type { RouteEnvelope } from "@/lib/sim/spec";
 import { COIN_DEFAULTS } from "@/lib/sim/sims/coin";
 import { COLLISION_DEFAULTS } from "@/lib/sim/sims/collision";
 import { FREEFALL_DEFAULTS } from "@/lib/sim/sims/freefall";
@@ -192,6 +195,8 @@ export default function Home() {
   const [runKey, setRunKey] = useState(0);
   const [t, setT] = useState(0);
   const [seenSetup, setSeenSetup] = useState("");
+  const [question, setQuestion] = useState("");
+  const [explanation, setExplanation] = useState<"idle" | "loading" | ExplanationResponse>("idle");
 
   const log = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -228,6 +233,9 @@ export default function Home() {
     setStarted(false);
     setRevealed(false);
     setT(0);
+    // A new setup is a new run, so any explanation of the old one is about
+    // something no longer on screen.
+    setExplanation("idle");
   }
 
   // Log once per revealed run, not once per render.
@@ -273,6 +281,51 @@ export default function Home() {
   const setIdeal = (key: string, value: boolean) =>
     setAllIdeal((p) => ({ ...p, [simId]: { ...p[simId], [key]: value } }));
 
+  /** Apply a routed spec: switch sim, adopt its parameters and idealisations. */
+  const applyRoute = (envelope: RouteEnvelope, asked: string) => {
+    if (envelope.decision !== "simulate") return;
+    const id = envelope.spec.sim_id;
+    setQuestion(asked);
+    setSimId(id);
+    setAllParams((p) => ({ ...p, [id]: { ...DEFAULTS[id], ...envelope.spec.params } }));
+    setAllIdeal((p) => ({
+      ...p,
+      [id]: { ...defaultIdealizations(id), ...(envelope.spec.idealizations ?? {}) },
+    }));
+  };
+
+  const requestExplanation = async () => {
+    setExplanation("loading");
+    const predictions = sim.predictions.map((target) => {
+      const said = committed?.values[target.key];
+      const was =
+        target.kind === "choice" ? target.resolve(trace) : trace.outcome[target.key];
+      const label = (v: string | number | undefined) =>
+        target.kind === "choice"
+          ? (target.options.find((o) => o.value === v)?.label ?? String(v))
+          : String(v);
+      return { prompt: target.prompt, said: label(said), was: label(was) };
+    });
+
+    try {
+      const res = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        // The SPEC, not the trace. The server re-runs it deterministically and
+        // explains numbers it computed itself.
+        body: JSON.stringify({
+          spec,
+          question: question || sim.question,
+          rationale: committed?.rationale ?? "",
+          predictions,
+        }),
+      });
+      setExplanation((await res.json()) as ExplanationResponse);
+    } catch (err) {
+      setExplanation({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   const summary = summarise(log);
 
   return (
@@ -285,6 +338,17 @@ export default function Home() {
           parameters, and nothing else.
         </p>
       </header>
+
+      <AskBox
+        onRouted={applyRoute}
+        examples={[
+          "when a truck hits a car, which one feels the bigger force?",
+          "do heavier things fall faster?",
+          "I got five heads in a row — is tails due?",
+          "should I switch doors?",
+          "why do like charges repel?",
+        ]}
+      />
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Simulation">
         {SIM_ORDER.map((id) => (
@@ -416,6 +480,12 @@ export default function Home() {
                     .join(" · ")}
                 </p>
               )}
+            </div>
+          )}
+
+          {revealed && (
+            <div className="mt-4">
+              <ExplanationPanel state={explanation} onRequest={() => void requestExplanation()} />
             </div>
           )}
 
