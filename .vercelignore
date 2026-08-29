@@ -1,0 +1,11 @@
+# The build happens on Vercel, so none of this needs uploading. Without it the
+# CLI walks a 600 MB tree — node_modules alone is 537 MB — and the upload
+# outlives any sensible timeout.
+node_modules
+.next
+.git
+
+# Research and planning are the repo's reason for existing, but they are not
+# part of the deployed app.
+research
+docs
